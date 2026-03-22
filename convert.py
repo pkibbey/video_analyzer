@@ -17,10 +17,10 @@ from typing import Any, Dict, Optional
 
 
 
-from openscenesense_ollama.analyzer import OllamaVideoAnalyzer
-from openscenesense_ollama.frame_selectors import DynamicFrameSelector, UniformFrameSelector, AllFrameSelector
-from openscenesense_ollama.models import AnalysisPrompts
-from openscenesense_ollama.transcriber import WhisperTranscriber
+from video_analyzer.analyzer import OllamaVideoAnalyzer
+from video_analyzer.frame_selectors import DynamicFrameSelector, UniformFrameSelector, AllFrameSelector
+from video_analyzer.models import AnalysisPrompts
+from video_analyzer.transcriber import WhisperTranscriber
 
 
 def _setup_colored_logging(level: str) -> None:
@@ -156,6 +156,18 @@ def _print_summary(data: Dict[str, Any], structured_output: bool) -> None:
         if video_props.get("bitrate"):
             bitrate_mbps = video_props.get('bitrate', 0) / 1_000_000
             print(f"  Bitrate: {bitrate_mbps:.2f} Mbps")
+        if video_props.get("data_rate"):
+            print(f"  Data Rate: {video_props.get('data_rate')}")
+        if video_props.get("audio_codec"):
+            print(f"  Audio Codec: {video_props.get('audio_codec')}")
+        if video_props.get("audio_sample_rate"):
+            sample_rate = video_props.get('audio_sample_rate', 0)
+            sample_rate_khz = sample_rate / 1000
+            print(f"  Audio Sample Rate: {sample_rate_khz:.1f} kHz ({sample_rate} Hz)")
+        if video_props.get("file_modified_date"):
+            print(f"  File Modified: {video_props.get('file_modified_date')}")
+        if video_props.get("file_created_date"):
+            print(f"  File Created: {video_props.get('file_created_date')}")
 
     if warnings:
         print("\nWarnings:")
@@ -166,7 +178,7 @@ def _print_summary(data: Dict[str, Any], structured_output: bool) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Playground demo for experimenting with OpenSceneSense Ollama.",
+        description="Playground demo for experimenting with VideoAnalyzer.",
     )
     parser.add_argument("video_path", help="Path to the video file")
     parser.add_argument("--frame-model", default="ministral-3:3b-cloud")
@@ -218,7 +230,7 @@ def main() -> int:
     parser.add_argument("--max-brief-chars", type=int, default=0, help="Max characters for brief summary (0 = unlimited)")
     parser.add_argument("--analyze-quality", dest="analyze_quality", action="store_true", default=True, help="Analyze frame quality metrics for video editing")
     parser.add_argument("--no-analyze-quality", dest="analyze_quality", action="store_false", help="Disable frame quality analysis")
-    parser.add_argument("--output", default=None, help="Write results to this JSON file (defaults to video filename with .json extension)")
+    parser.add_argument("--output", default=None, help="Write results to this JSON file (defaults to stdout)")
     parser.add_argument("--cache-dir", help="Directory to cache analysis results")
     parser.add_argument("--force", action="store_true", help="Ignore cached results")
     parser.add_argument("--structured-output", action="store_true", default=True, help="Always output JSON (to file if --output specified, else to stdout)")
@@ -229,17 +241,6 @@ def main() -> int:
     args = parser.parse_args()
 
     _setup_colored_logging(args.log_level)
-
-    # Derive output filename from video path if not specified
-    if args.output is None:
-        video_path = Path(args.video_path)
-        # Extract clean model names for filename
-        whisper_name = args.whisper_model.split("/")[-1].replace(":", "-")
-        frame_name = args.frame_model.split("/")[-1].replace(":", "-")
-        summary_name = args.summary_model.split("/")[-1].replace(":", "-")
-        # Build filename with models: video_whisper_frame_summary.json
-        stem = video_path.stem
-        args.output = str(video_path.parent / f"{stem}_{whisper_name}_{frame_name}_{summary_name}.json")
 
     prompts_data = _load_prompts(args.prompts_file)
     if args.frame_prompt:

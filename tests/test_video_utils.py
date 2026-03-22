@@ -1,4 +1,4 @@
-import openscenesense_ollama.video_utils as video_utils
+import video_analyzer.video_utils as video_utils
 
 
 def test_get_video_duration_prefers_ffmpeg(monkeypatch):

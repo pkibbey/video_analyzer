@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "openscenesense-ollama"
+name = "video-analyzer"
 version = "1.1.0"
 description = "Offline video analysis using Ollama models and local Whisper"
 authors = [{name = "Rohit Yelukati Mahendra", email = "mahendrarohittigon@gmail.com"}]
@@ -22,17 +22,22 @@ dependencies = [
     "torch>=2.5.1",
     "transformers>=4.46.1",
     "librosa>=0.10.2.post1",
-    "ffmpeg-python>=0.2.0"
+    "ffmpeg-python>=0.2.0",
+    "fastapi>=0.100.0",
+    "uvicorn>=0.24.0",
+    "python-multipart>=0.0.6",
+    "pydantic>=2.0"
 ]
 
 [project.optional-dependencies]
 dev = ["pytest"]
 
 [project.scripts]
-openscenesense-ollama = "openscenesense_ollama.cli:main"
+video-analyzer = "video_analyzer.cli:main"
+video-analyzer-api = "video_analyzer.api_server:run"
 
 [tool.hatch.build.targets.wheel]
-packages = ["openscenesense_ollama"]
+packages = ["video_analyzer"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

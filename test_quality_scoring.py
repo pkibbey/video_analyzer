@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """Quick test to verify quality scoring integration"""
 
-from openscenesense_ollama.models import (
+from video_analyzer.models import (
     AnalysisPrompts,
     FrameAnalysis,
     SummaryResult,
 )
-from openscenesense_ollama.analyzer import OllamaVideoAnalyzer
+from video_analyzer.analyzer import OllamaVideoAnalyzer
 
 # Test 1: Verify prompts load correctly
 print("Test 1: Loading prompts...")

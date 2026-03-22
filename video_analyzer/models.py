@@ -113,6 +113,11 @@ class VideoProperties:
     bitrate: Optional[int] = None  # Bitrate in bits per second
     format: Optional[str] = None  # Container format (e.g., mp4, mov)
     duration: Optional[float] = None  # Video duration in seconds
+    data_rate: Optional[str] = None  # Human-readable bitrate (e.g., "1.5 Mbps")
+    audio_codec: Optional[str] = None  # Audio codec (e.g., aac, mp3)
+    audio_sample_rate: Optional[int] = None  # Audio sample rate in Hz (e.g., 48000)
+    file_modified_date: Optional[str] = None  # File modification date (ISO format)
+    file_created_date: Optional[str] = None  # File creation date (ISO format)
 
 
 @dataclass

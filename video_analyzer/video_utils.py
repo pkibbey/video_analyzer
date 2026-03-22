@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import logging
+import os
+from datetime import datetime
 from typing import Optional, Dict, Any
 
 import ffmpeg
@@ -10,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 
 def get_video_properties(video_path: str) -> Dict[str, Any]:
-    """Extract comprehensive video properties including fps, dimensions, codec, etc."""
+    """Extract comprehensive video properties including fps, dimensions, codec, file dates, audio format, etc."""
     properties = {
         "fps": None,
         "total_frames": None,
@@ -20,7 +22,24 @@ def get_video_properties(video_path: str) -> Dict[str, Any]:
         "duration": None,
         "bitrate": None,
         "format": None,
+        "data_rate": None,
+        "audio_codec": None,
+        "audio_sample_rate": None,
+        "file_modified_date": None,
+        "file_created_date": None,
     }
+    
+    # Extract file date information
+    try:
+        stat = os.stat(video_path)
+        # File modification date
+        mtime = datetime.fromtimestamp(stat.st_mtime)
+        properties["file_modified_date"] = mtime.isoformat()
+        # File creation date (ctime may differ across OS)
+        ctime = datetime.fromtimestamp(stat.st_ctime)
+        properties["file_created_date"] = ctime.isoformat()
+    except Exception as exc:
+        logger.debug("Failed to extract file dates: %s", exc)
     
     # Try to get properties using ffprobe first (more reliable)
     try:
@@ -32,9 +51,15 @@ def get_video_properties(video_path: str) -> Dict[str, Any]:
         properties["bitrate"] = int(format_info.get("bit_rate", 0)) if format_info.get("bit_rate") else None
         properties["format"] = format_info.get("format_name", "").split(",")[0] if format_info.get("format_name") else None
         
-        # Get video stream info
+        # Format bitrate as human-readable string (e.g., "1.5 Mbps")
+        if properties["bitrate"] and properties["bitrate"] > 0:
+            bitrate_mbps = properties["bitrate"] / 1_000_000
+            properties["data_rate"] = f"{bitrate_mbps:.2f} Mbps"
+        
+        # Get video and audio stream info
         streams = info.get("streams", [])
         video_stream = next((s for s in streams if s.get("codec_type") == "video"), None)
+        audio_stream = next((s for s in streams if s.get("codec_type") == "audio"), None)
         
         if video_stream:
             properties["codec"] = video_stream.get("codec_name")
@@ -46,6 +71,11 @@ def get_video_properties(video_path: str) -> Dict[str, Any]:
                 properties["total_frames"] = int(properties["fps"] * properties["duration"])
             elif video_stream.get("nb_frames"):
                 properties["total_frames"] = int(video_stream.get("nb_frames"))
+        
+        # Extract audio stream information
+        if audio_stream:
+            properties["audio_codec"] = audio_stream.get("codec_name")
+            properties["audio_sample_rate"] = int(audio_stream.get("sample_rate", 0)) if audio_stream.get("sample_rate") else None
     except Exception as exc:
         logger.debug("ffprobe lookup failed: %s", exc)
     

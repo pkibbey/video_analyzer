@@ -1,4 +1,4 @@
-from openscenesense_ollama.frame_selectors import _compute_frame_indices
+from video_analyzer.frame_selectors import _compute_frame_indices
 
 
 def test_compute_frame_indices_empty():

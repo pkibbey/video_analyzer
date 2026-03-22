@@ -1,6 +1,6 @@
 import requests
 
-from openscenesense_ollama.analyzer import OllamaVideoAnalyzer
+from video_analyzer.analyzer import OllamaVideoAnalyzer
 
 
 class DummyResponse:

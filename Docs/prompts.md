@@ -1,7 +1,7 @@
 
-# Innovative Video Analysis Prompt Examples for OpenSceneSense
+# Innovative Video Analysis Prompt Examples for VideoAnalyzer
 
-Harness the full potential of **OpenSceneSense** with these innovative video analysis prompt examples. These prompts are categorized into **Frame-Based Analysis**, **Detailed Summaries**, and **Brief Summaries** to align with OpenSceneSense's `AnalysisPrompts` structure. Each example includes a detailed description and potential use cases to inspire your projects.
+Harness the full potential of **VideoAnalyzer** with these innovative video analysis prompt examples. These prompts are categorized into **Frame-Based Analysis**, **Detailed Summaries**, and **Brief Summaries** to align with VideoAnalyzer's `AnalysisPrompts` structure. Each example includes a detailed description and potential use cases to inspire your projects.
 
 ---
 
@@ -10,7 +10,7 @@ Harness the full potential of **OpenSceneSense** with these innovative video ana
 1. [Frame-Based Analysis Prompts](#frame-based-analysis-prompts)
 2. [Detailed Summary Prompts](#detailed-summary-prompts)
 3. [Brief Summary Prompts](#brief-summary-prompts)
-4. [Leveraging These Prompts with OpenSceneSense](#leveraging-these-prompts-with-openscenesense)
+4. [Leveraging These Prompts with VideoAnalyzer](#leveraging-these-prompts-with-videoanalyzer)
 5. [Best Practices](#best-practices)
 6. [Conclusion](#conclusion)
 
@@ -268,25 +268,25 @@ Delivers a quick and clear snapshot of the video's content, ideal for situations
 
 ---
 
-## 4. Leveraging These Prompts with OpenSceneSense
+## 4. Leveraging These Prompts with VideoAnalyzer
 
-Integrate these innovative prompts into your **OpenSceneSense** workflows to unlock deeper insights and build more sophisticated video analysis applications. Customize and combine these prompts to suit your specific project needs, whether you're developing interactive applications, enhancing content creation, or conducting advanced research.
+Integrate these innovative prompts into your **VideoAnalyzer** workflows to unlock deeper insights and build more sophisticated video analysis applications. Customize and combine these prompts to suit your specific project needs, whether you're developing interactive applications, enhancing content creation, or conducting advanced research.
 
 ### **Getting Started**
 
 1. **Choose Appropriate Prompts:** Select prompts from the categories that best align with your analysis goals—Frame-Based Analysis, Detailed Summaries, or Brief Summaries.
 2. **Customize if Needed:** Modify the prompts to better fit your specific use case or to include additional context.
-3. **Integrate with OpenSceneSense:** Utilize the prompts within your `AnalysisPrompts` configuration.
+3. **Integrate with VideoAnalyzer:** Utilize the prompts within your `AnalysisPrompts` configuration.
 4. **Analyze and Iterate:** Run the analysis, review the results, and refine your prompts for optimal outcomes.
 
 ### **Example Integration**
 
-Here's how you can integrate these prompts into your **OpenSceneSense Ollama** setup:
+Here's how you can integrate these prompts into your **VideoAnalyzer** setup:
 
 ```python
-from openscenesense_ollama.models import AnalysisPrompts
-from openscenesense_ollama.analyzer import OllamaVideoAnalyzer
-from openscenesense_ollama.frame_selectors import DynamicFrameSelector
+from video_analyzer.models import AnalysisPrompts
+from video_analyzer.analyzer import OllamaVideoAnalyzer
+from video_analyzer.frame_selectors import DynamicFrameSelector
 import logging
 
 # Define custom prompts
@@ -337,7 +337,7 @@ for key, value in results['metadata'].items():
 
 ## 5. Best Practices
 
-To maximize the effectiveness of your prompts within **OpenSceneSense**, consider the following best practices:
+To maximize the effectiveness of your prompts within **VideoAnalyzer**, consider the following best practices:
 
 ### **5.1. Be Specific and Clear**
 
@@ -368,4 +368,4 @@ To maximize the effectiveness of your prompts within **OpenSceneSense**, conside
 
 ## 6. Conclusion
 
-These innovative prompt examples are tailored to fit **OpenSceneSense**'s `AnalysisPrompts` structure, providing specialized prompts for **Frame-Based Analysis**, **Detailed Summaries**, and **Brief Summaries**. By integrating these prompts into your workflows, you can unlock deeper insights and build more sophisticated video analysis applications. Customize and expand upon these examples to explore new possibilities and enhance your projects with intelligent video-centric solutions.
+These innovative prompt examples are tailored to fit **VideoAnalyzer**'s `AnalysisPrompts` structure, providing specialized prompts for **Frame-Based Analysis**, **Detailed Summaries**, and **Brief Summaries**. By integrating these prompts into your workflows, you can unlock deeper insights and build more sophisticated video analysis applications. Customize and expand upon these examples to explore new possibilities and enhance your projects with intelligent video-centric solutions.

@@ -1,26 +1,27 @@
-# OpenSceneSense Ollama
+# VideoAnalyzer
 
-**OpenSceneSense Ollama** is a powerful Python package that brings advanced video analysis capabilities using Ollama's local models. By leveraging local AI models, this package offers frame analysis, audio transcription, dynamic frame selection, and comprehensive video summaries without relying on cloud-based APIs.
+**VideoAnalyzer** is a powerful Python package that brings advanced video analysis capabilities using Ollama's local models. By leveraging local AI models, this package offers frame analysis, audio transcription, dynamic frame selection, and comprehensive video summaries without relying on cloud-based APIs.
 
 ## Table of Contents
 
-1. [🚀 Why OpenSceneSense Ollama?](#-why-openscenesense-ollama)
+1. [🚀 Why VideoAnalyzer?](#-why-videoanalyzer)
 2. [🌟 Features](#-features)
 3. [📦 Installation](#-installation)
 4. [🛠️ Usage](#-usage)
 5. [⚙️ Configuration Options](#-configuration-options)
 6. [🖥️ CLI](#-cli)
-7. [🧪 Playground Demo](#-playground-demo)
-8. [🧱 Structured Outputs](#-structured-outputs)
-9. [🎯 Customizing Prompts](#-customizing-prompts)
-10. [📈 Applications](#-applications)
-11. [🛠️ Contributing](#-contributing)
-12. [📄 License](#-license)
-13. [📄 Additional Resources](Docs/prompts.md)
+7. [🚀 REST API Service](#-rest-api-service)
+8. [🧪 Playground Demo](#-playground-demo)
+9. [🧱 Structured Outputs](#-structured-outputs)
+10. [🎯 Customizing Prompts](#-customizing-prompts)
+11. [📈 Applications](#-applications)
+12. [🛠️ Contributing](#-contributing)
+13. [📄 License](#-license)
+14. [📄 Additional Resources](Docs/prompts.md)
 
-## 🚀 Why OpenSceneSense Ollama?
+## 🚀 Why VideoAnalyzer?
 
-OpenSceneSense Ollama brings the power of video analysis to your local machine. By using Ollama's models, you can:
+VideoAnalyzer brings the power of video analysis to your local machine. By using Ollama's models, you can:
 
 - Run everything locally without depending on external APIs
 - Maintain data privacy by processing videos on your own hardware
@@ -78,21 +79,21 @@ brew install ffmpeg
 1. Download FFmpeg from [ffmpeg.org/download.html](https://ffmpeg.org/download.html)
 2. Extract and add to PATH
 
-### Install OpenSceneSense Ollama
+### Install VideoAnalyzer
 
 ```bash
-pip install openscenesense-ollama
+pip install video-analyzer
 ```
 
 ## 🛠️ Usage
 
-Here's a complete example showing how to use OpenSceneSense Ollama:
+Here's a complete example showing how to use VideoAnalyzer:
 
 ```python
-from openscenesense_ollama.models import AnalysisPrompts
-from openscenesense_ollama.transcriber import WhisperTranscriber
-from openscenesense_ollama.analyzer import OllamaVideoAnalyzer
-from openscenesense_ollama.frame_selectors import DynamicFrameSelector
+from video_analyzer.models import AnalysisPrompts
+from video_analyzer.transcriber import WhisperTranscriber
+from video_analyzer.analyzer import OllamaVideoAnalyzer
+from video_analyzer.frame_selectors import DynamicFrameSelector
 import logging
 
 # Configure logging
@@ -284,7 +285,7 @@ analyzer = OllamaVideoAnalyzer(
 Analyze videos from the command line and output JSON results:
 
 ```bash
-openscenesense-ollama /path/to/video.mp4 --audio --output result.json --cache-dir .cache
+video-analyzer /path/to/video.mp4 --audio --output result.json --cache-dir .cache
 ```
 
 Common options:
@@ -296,6 +297,49 @@ Common options:
 - `--cache-dir` to reuse results for the same inputs
 - `--structured-output` to emit nested structured JSON
 - `--schema` to print the structured JSON schema
+
+## 🚀 REST API Service
+
+Run VideoAnalyzer as a REST API server with a background job queue:
+
+```bash
+video-analyzer-api --host 0.0.0.0 --port 8000
+```
+
+The API provides:
+- **Submit jobs** via `POST /analyze` with video path and optional parameters
+- **Check status** via `GET /jobs/{job_id}`
+- **Get results** via `GET /jobs/{job_id}/result` when complete
+- **List jobs** via `GET /jobs` with optional status filter
+- **Interactive docs** at `http://localhost:8000/docs` (Swagger UI)
+
+### Quick Example
+
+```bash
+# Submit a video
+curl -X POST http://localhost:8000/analyze \
+  -H "Content-Type: application/json" \
+  -d '{"video_path": "/path/to/video.mp4"}'
+
+# Check status
+curl http://localhost:8000/jobs/<job_id>
+
+# Get result when complete
+curl http://localhost:8000/jobs/<job_id>/result
+```
+
+### Python Client
+
+```python
+from api_client import APIClient
+
+client = APIClient("http://localhost:8000")
+job = client.submit_analysis("/path/to/video.mp4")
+result = client.wait_for_completion(job['job_id'])
+print(result['result'])
+```
+
+For full API documentation, see [Docs/api.md](Docs/api.md).
 
 ## 🧪 Playground Demo
 
@@ -312,7 +356,7 @@ Useful flags include `--segment-duration`, `--beam-size`, `--temperature`, and `
 For typed results, use `analyze_video_structured` and convert to JSON when needed:
 
 ```python
-from openscenesense_ollama.analyzer import OllamaVideoAnalyzer
+from video_analyzer.analyzer import OllamaVideoAnalyzer
 
 analyzer = OllamaVideoAnalyzer()
 result = analyzer.analyze_video_structured("your_video.mp4")
@@ -329,7 +373,7 @@ structured_dict = result.to_dict()
 To retrieve a JSON schema:
 
 ```python
-from openscenesense_ollama.models import analysis_result_schema
+from video_analyzer.models import analysis_result_schema
 
 schema = analysis_result_schema()
 ```
@@ -337,14 +381,14 @@ schema = analysis_result_schema()
 Or via CLI:
 
 ```bash
-openscenesense-ollama --schema
+video-analyzer --schema
 ```
 
 Schema file in repo: `Docs/analysis_result.schema.json`
 
 ## 🎯 Customizing Prompts
 
-OpenSceneSense Ollama allows you to customize prompts for different types of analyses. The `AnalysisPrompts` class accepts the following parameters:
+VideoAnalyzer allows you to customize prompts for different types of analyses. The `AnalysisPrompts` class accepts the following parameters:
 
 - **frame_analysis:** Guide the model's focus during frame analysis
 - **detailed_summary:** Template for comprehensive video summaries
@@ -357,7 +401,7 @@ Available template tags:
 
 ## 📈 Applications
 
-OpenSceneSense Ollama is ideal for:
+VideoAnalyzer is ideal for:
 
 - **Content Creation:** Automatically generate video descriptions and summaries
 - **Education:** Analyze educational content and create study materials

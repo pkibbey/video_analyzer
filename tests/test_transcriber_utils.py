@@ -1,4 +1,4 @@
-from openscenesense_ollama.transcriber import _collapse_repeated_phrases
+from video_analyzer.transcriber import _collapse_repeated_phrases
 
 
 def test_collapse_repeated_phrases():

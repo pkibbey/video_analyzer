@@ -1,4 +1,4 @@
-from openscenesense_ollama.models import (
+from video_analyzer.models import (
     AnalysisResult,
     SummaryResult,
     FrameAnalysis,
