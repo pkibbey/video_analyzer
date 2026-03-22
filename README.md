@@ -118,8 +118,8 @@ custom_prompts = AnalysisPrompts(
 
 # Initialize analyzer
 analyzer = OllamaVideoAnalyzer(
-    frame_analysis_model="ministral-3:latest",
-    summary_model="ministral-3:latest",
+    frame_analysis_model="ministral-3:3b-cloud",
+    summary_model="ministral-3:3b-cloud",
     min_frames=10,
     max_frames=64,
     frames_per_minute=10.0,
@@ -153,14 +153,14 @@ The `OllamaVideoAnalyzer` class offers extensive configuration options to custom
 
 ### Basic Configuration
 
-- **frame_analysis_model** (str, default="ministral-3:latest")
+- **frame_analysis_model** (str, default="ministral-3:3b-cloud")
   - The Ollama model to use for analyzing individual frames
-  - Common options: "ministral-3:latest", "llava", "minicpm-v", "bakllava"
+  - Common options: "ministral-3:3b-cloud", "llava", "minicpm-v", "bakllava"
   - Choose models with vision capabilities for best results
 
-- **summary_model** (str, default="ministral-3:latest")
+- **summary_model** (str, default="ministral-3:3b-cloud")
   - The Ollama model used for generating video summaries
-  - Common options: "ministral-3:latest", "llama3.2", "mistral"
+  - Common options: "ministral-3:3b-cloud", "llama3.2", "mistral"
   - Text-focused models work best for summarization
 
 - **host** (str, default="http://localhost:11434")
@@ -255,7 +255,7 @@ Here's an example of a fully configured analyzer with custom settings:
 ```python
 analyzer = OllamaVideoAnalyzer(
     frame_analysis_model="llava",
-    summary_model="ministral-3:latest",
+    summary_model="ministral-3:3b-cloud",
     host="http://localhost:11434",
     min_frames=12,
     max_frames=48,

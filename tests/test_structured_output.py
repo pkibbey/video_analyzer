@@ -11,10 +11,13 @@ from openscenesense_ollama.models import (
 
 def _build_result() -> AnalysisResult:
     summary = SummaryResult(
-        detailed="detailed summary",
+        detailed={
+            "objective_summary": "Test objective",
+            "visual_observations": "Test observations",
+            "audio_transcript": "Test transcript",
+            "sequence_of_events": "Test sequence"
+        },
         brief="brief summary",
-        timeline="timeline",
-        transcript="transcript",
     )
     frames = [
         FrameAnalysis(timestamp=1.0, description="ok", scene_type="static"),
@@ -55,7 +58,9 @@ def test_analysis_result_to_legacy_dict():
     result = _build_result()
     legacy = result.to_legacy_dict()
 
-    assert legacy["summary"] == "detailed summary"
+    # Legacy format combines structured detailed into a narrative
+    assert "Test objective" in legacy["summary"]
+    assert "Test observations" in legacy["summary"]
     assert legacy["brief_summary"] == "brief summary"
     assert legacy["warnings"] == ["warning"]
     assert "error" not in legacy["frame_analyses"][0]

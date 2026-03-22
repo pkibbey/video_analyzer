@@ -53,8 +53,8 @@ def main() -> int:
         description="Analyze videos using OpenSceneSense Ollama and output JSON results."
     )
     parser.add_argument("video_path", nargs="?", help="Path to the video file")
-    parser.add_argument("--frame-model", default="ministral-3:latest")
-    parser.add_argument("--summary-model", default="ministral-3:latest")
+    parser.add_argument("--frame-model", default="ministral-3:3b-cloud")
+    parser.add_argument("--summary-model", default="ministral-3:3b-cloud")
     parser.add_argument("--host", default="http://localhost:11434")
     parser.add_argument("--min-frames", type=int, default=8)
     parser.add_argument("--max-frames", type=int, default=64)
@@ -74,6 +74,10 @@ def main() -> int:
     parser.add_argument("--output", help="Write results to this JSON file")
     parser.add_argument("--cache-dir", help="Directory to cache analysis results")
     parser.add_argument("--force", action="store_true", help="Ignore cached results")
+    parser.add_argument("--analyze-quality", dest="analyze_quality", action="store_true", default=True, help="Analyze frame quality metrics for video editing")
+    parser.add_argument("--no-analyze-quality", dest="analyze_quality", action="store_false", help="Disable frame quality analysis")
+    parser.add_argument("--local-files-only", dest="local_files_only", action="store_true", default=True, help="Load Whisper model only from local HF cache (no network fetch, default)")
+    parser.add_argument("--no-local-files-only", dest="local_files_only", action="store_false", help="Allow network fetch for Whisper model if not available locally")
     parser.add_argument("--structured-output", action="store_true", help="Output structured JSON results")
     parser.add_argument("--schema", action="store_true", help="Print the structured output JSON schema and exit")
     parser.add_argument("--log-level", default="INFO", choices=["DEBUG", "INFO", "WARNING", "ERROR"])
@@ -112,6 +116,7 @@ def main() -> int:
         audio_transcriber = WhisperTranscriber(
             model_name=args.whisper_model,
             device=args.device,
+            local_files_only=args.local_files_only,
         )
 
     params_for_cache = {
@@ -131,6 +136,7 @@ def main() -> int:
         "retry_backoff": args.retry_backoff,
         "prompts": prompts_data,
         "structured_output": args.structured_output,
+        "analyze_quality": args.analyze_quality,
     }
 
     cache_path = None
@@ -160,6 +166,7 @@ def main() -> int:
         request_timeout=args.timeout,
         request_retries=args.retries,
         request_backoff=args.retry_backoff,
+        analyze_quality=args.analyze_quality,
     )
 
     if args.structured_output:

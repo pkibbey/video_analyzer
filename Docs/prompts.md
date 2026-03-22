@@ -304,8 +304,8 @@ custom_prompts = AnalysisPrompts(
 
 # Initialize the video analyzer
 analyzer = OllamaVideoAnalyzer(
-    frame_analysis_model="ministral-3:latest",
-    summary_model="ministral-3:latest",
+    frame_analysis_model="ministral-3:3b-cloud",
+    summary_model="ministral-3:3b-cloud",
     prompts=custom_prompts,
     min_frames=8,
     max_frames=32,

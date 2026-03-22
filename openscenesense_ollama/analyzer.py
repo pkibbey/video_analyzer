@@ -1,5 +1,7 @@
-from typing import List, Dict, Tuple, Optional, Callable
+from typing import List, Dict, Tuple, Optional, Callable, Union, Any
 import logging
+import json
+import time
 from .models import (
     AnalysisPrompts,
     Frame,
@@ -9,6 +11,8 @@ from .models import (
     SummaryResult,
     AnalysisMetadata,
     ModelsUsed,
+    ProcessingTimings,
+    VideoProperties,
     AnalysisResult,
 )
 from .frame_selectors import FrameSelector,DynamicFrameSelector
@@ -20,13 +24,13 @@ import base64
 import requests
 import time
 import re
-from .video_utils import get_video_duration
+from .video_utils import get_video_duration, get_video_properties
 
 class OllamaVideoAnalyzer:
     def __init__(
             self,
-            frame_analysis_model: str = "ministral-3:latest",
-            summary_model: str = "ministral-3:latest",
+            frame_analysis_model: str = "ministral-3:3b-cloud",
+            summary_model: str = "ministral-3:3b-cloud",
             host: str = "http://localhost:11434",
             min_frames: int = 8,
             max_frames: int = 64,
@@ -41,6 +45,9 @@ class OllamaVideoAnalyzer:
             request_backoff: float = 1.0,
             context_max_chars: int = 0,
             audio_context_max_chars: int = 0,
+            analyze_quality: bool = False,
+            max_detailed_summary_chars: int = 0,
+            max_brief_summary_chars: int = 0,
     ):
         self.frame_analysis_model = frame_analysis_model
         self.summary_model = summary_model
@@ -53,6 +60,7 @@ class OllamaVideoAnalyzer:
         self.audio_transcriber = audio_transcriber
         self.prompts = prompts or AnalysisPrompts()
         self.custom_frame_processor = custom_frame_processor
+        self.analyze_quality = analyze_quality
         self.logger = logging.getLogger(__name__)
         self.session = requests.Session()
         self.request_timeout = request_timeout
@@ -61,6 +69,8 @@ class OllamaVideoAnalyzer:
         self.retry_status_codes = {408, 429, 500, 502, 503, 504}
         self.context_max_chars = max(0, context_max_chars)
         self.audio_context_max_chars = max(0, audio_context_max_chars)
+        self.max_detailed_summary_chars = max(0, max_detailed_summary_chars)
+        self.max_brief_summary_chars = max(0, max_brief_summary_chars)
         logging.basicConfig(level=log_level)
 
     def _frame_to_base64(self, frame: np.ndarray) -> str:
@@ -74,9 +84,15 @@ class OllamaVideoAnalyzer:
         """Format audio transcript with timestamps"""
         formatted = []
         for segment in segments:
+            if not segment.text:
+                continue
             formatted.append(
                 f"[{segment.start_time:.1f}s - {segment.end_time:.1f}s]: {segment.text}"
             )
+
+        if not formatted:
+            return "No speech detected."
+
         return "\n".join(formatted)
 
     def _format_frame_descriptions(self, descriptions: List[FrameAnalysis]) -> str:
@@ -130,6 +146,49 @@ class OllamaVideoAnalyzer:
             "Do not reference it explicitly unless it is directly visible in the frame."
         )
         return f"{header}\n" + "\n".join(parts)
+
+    def _detect_hallucinations(self, text: str, min_repeat_count: int = 3) -> Dict[str, any]:
+        """
+        Detect repeated chunks of text that appear more than min_repeat_count times in a row.
+        Returns a dict with 'text' and 'hallucinations' keys.
+        """
+        hallucinations = []
+        
+        # Split text into sentences
+        sentences = re.split(r'(?<=[.!?])\s+', text.strip())
+        if not sentences:
+            return {"text": text, "hallucinations": []}
+        
+        # Check for repeated sentence patterns
+        i = 0
+        while i < len(sentences):
+            current_sentence = sentences[i].strip()
+            if not current_sentence:
+                i += 1
+                continue
+            
+            # Count consecutive repeats of this sentence
+            repeat_count = 1
+            j = i + 1
+            while j < len(sentences) and sentences[j].strip() == current_sentence:
+                repeat_count += 1
+                j += 1
+            
+            # If sentence repeats more than threshold, flag it
+            if repeat_count >= min_repeat_count:
+                hallucinations.append({
+                    "text": current_sentence,
+                    "count": repeat_count,
+                    "indices": list(range(i, i + repeat_count))
+                })
+                i = j
+            else:
+                i += 1
+        
+        return {
+            "text": text,
+            "hallucinations": hallucinations
+        }
 
     def _sleep_with_backoff(self, attempt: int) -> None:
         delay = self.request_backoff * (2 ** (attempt - 1))
@@ -200,9 +259,10 @@ class OllamaVideoAnalyzer:
             response = self._post_with_retries(payload, "frame analysis")
             result = response.json()
             if "message" in result:
+                desc = self._normalize_model_text(result["message"]["content"])
                 return FrameAnalysis(
                     timestamp=frame.timestamp,
-                    description=result["message"]["content"],
+                    description=desc,
                     scene_type=frame.scene_type.value,
                 )
             else:
@@ -215,6 +275,196 @@ class OllamaVideoAnalyzer:
                 scene_type=frame.scene_type.value,
                 error=str(e),
             )
+
+    def _analyze_frame_quality(self, frame: Frame) -> Tuple[Optional[Union[Dict[str, Any], str]], Optional[Dict[str, Any]]]:
+        """Analyze frame quality metrics for editing usability.
+        
+        Returns:
+            Tuple of (quality_analysis_text, quality_scores_dict)
+        """
+        base64_image = self._frame_to_base64(frame.image)
+        
+        messages = []
+        if self.prompts.quality_analysis_system:
+            messages.append({"role": "system", "content": self.prompts.quality_analysis_system})
+        messages.append({"role": "user", "content": self.prompts.quality_analysis, "images": [base64_image]})
+
+        payload = {
+            "model": self.frame_analysis_model,
+            "messages": messages,
+            "stream": False
+        }
+
+        try:
+            response = self._post_with_retries(payload, "quality analysis")
+            result = response.json()
+            if "message" in result:
+                raw_quality_text = result["message"]["content"]
+                quality_text = self._normalize_model_text(raw_quality_text)
+                quality_scores = self._extract_quality_scores_from_text(quality_text)
+
+                if quality_scores is not None:
+                    # Store parsed JSON object for quality_analysis + quality_scores
+                    return quality_scores, quality_scores
+
+                self.logger.warning(
+                    f"Could not parse quality scores at {frame.timestamp}s; storing quality analysis object with raw text."
+                )
+                return {"raw_quality_analysis": quality_text}, None
+            else:
+                raise Exception("Invalid response format")
+        except Exception as e:
+            self.logger.error(f"Error analyzing frame quality: {str(e)}")
+            return None, None
+
+    def _extract_quality_scores_from_text(self, text: str) -> Optional[Dict]:
+        """Try to extract a JSON object from model text output and parse to dict."""
+        try:
+            return json.loads(text.strip())
+        except json.JSONDecodeError:
+            pass
+
+        # Attempt to extract JSON object even if wrapped by text
+        start = text.find("{")
+        end = text.rfind("}")
+        if start >= 0 and end > start:
+            candidate = text[start:end + 1].strip()
+            try:
+                return json.loads(candidate)
+            except json.JSONDecodeError:
+                pass
+
+        # Fallback: try row-by-row key:value map (not strict JSON)
+        # Example: focus: 8\nexposure: 7
+        metrics = {}
+        for line in text.splitlines():
+            if ":" in line:
+                key, value = line.split(":", 1)
+                key = key.strip().strip('"')
+                value = value.strip().strip('"')
+                if not key:
+                    continue
+                try:
+                    metrics[key] = float(value) if "." in value else int(value)
+                    continue
+                except ValueError:
+                    pass
+                # List detection
+                if value.startswith("[") and value.endswith("]"):
+                    try:
+                        metrics[key] = json.loads(value)
+                        continue
+                    except json.JSONDecodeError:
+                        pass
+                metrics[key] = value
+        return metrics or None
+
+    def _normalize_model_text(self, text: Optional[str]) -> str:
+        """Normalize model text outputs: strip code fences and whitespace."""
+        if not text:
+            return ""
+        normalized = text.strip()
+
+        # Remove triple backticks and optional language label
+        code_fences = ["```json", "```", "~~~"]
+        for fence in code_fences:
+            if normalized.startswith(fence):
+                # Remove leading fence
+                normalized = normalized[len(fence):].strip()
+                # Remove trailing fence if exists
+                if normalized.endswith(fence):
+                    normalized = normalized[:-len(fence)].strip()
+                break
+
+        # Remove standalone code block close markers
+        if normalized.endswith("```"):
+            normalized = normalized[:-3].strip()
+        if normalized.endswith("~~~"):
+            normalized = normalized[:-3].strip()
+
+        return normalized
+
+    def _calculate_trim_recommendations(self, frame_analyses: List[FrameAnalysis], video_duration: float) -> Dict[str, any]:
+        """Calculate trim point recommendations based on frame quality scores"""
+        def _to_float_quality(value: Any) -> float:
+            if isinstance(value, (int, float)):
+                return float(value)
+            if isinstance(value, str):
+                value = value.strip()
+                if not value:
+                    return 0.0
+                # Support values like "7", "7.5", "7/10"
+                try:
+                    return float(value)
+                except ValueError:
+                    if "/" in value:
+                        parts = value.split("/")
+                        try:
+                            num = float(parts[0].strip())
+                            den = float(parts[1].strip()) if len(parts) > 1 and parts[1].strip() else 1.0
+                            return (num / den) * 10.0 if den != 0 else num
+                        except ValueError:
+                            pass
+            return 0.0
+
+        quality_timeline = []
+        for analysis in frame_analyses:
+            if analysis.quality_scores:
+                quality_timeline.append({
+                    "timestamp": analysis.timestamp,
+                    "overall_quality": _to_float_quality(analysis.quality_scores.get("overall_quality", 5)),
+                    "issues": analysis.quality_scores.get("issues", [])
+                })
+        
+        if not quality_timeline:
+            return {}
+        
+        # Sort by timestamp
+        quality_timeline.sort(key=lambda x: x["timestamp"])
+        
+        # Find trim points (start and end of usable content)
+        # Quality threshold for "usable" content
+        quality_threshold = 4  # out of 10
+        
+        usable_regions = []
+        current_start = None
+        
+        for idx, item in enumerate(quality_timeline):
+            if item["overall_quality"] >= quality_threshold:
+                if current_start is None:
+                    current_start = item["timestamp"]
+            else:
+                if current_start is not None:
+                    end_ts = quality_timeline[idx - 1]["timestamp"] if idx > 0 else item["timestamp"]
+                    usable_regions.append({
+                        "start": current_start,
+                        "end": end_ts
+                    })
+                    current_start = None
+        
+        # Close final region if still open
+        if current_start is not None:
+            usable_regions.append({
+                "start": current_start,
+                "end": quality_timeline[-1]["timestamp"]
+            })
+        
+        # Find best region (longest high-quality section)
+        best_region = max(usable_regions, key=lambda x: x["end"] - x["start"]) if usable_regions else None
+        
+        # Identify problem zones
+        problem_zones = [item for item in quality_timeline if item["issues"]]
+        
+        return {
+            "quality_timeline": quality_timeline,
+            "recommended_trim": {
+                "start": best_region["start"] if best_region else 0,
+                "end": best_region["end"] if best_region else video_duration
+            } if best_region else None,
+            "usable_regions": usable_regions,
+            "problem_zones": problem_zones,
+            "analysis_note": "Trim recommendations based on visual quality assessment across frames"
+        }
 
     def _generate_summary(
         self,
@@ -255,55 +505,77 @@ class OllamaVideoAnalyzer:
             brief_response = self._post_with_retries(brief_payload, "summary (brief)")
             brief_result = brief_response.json()
 
+            # Extract detailed summary as plain string
+            detailed_text = (
+                self._normalize_model_text(detailed_result["message"]["content"])
+                if "message" in detailed_result
+                else "Unable to generate detailed summary"
+            )
+            
+            # Apply text length limits to detailed summary
+            if self.max_detailed_summary_chars > 0:
+                detailed_text = self._truncate_text(detailed_text, self.max_detailed_summary_chars)
+            
+            # Extract brief summary
+            brief_text = (
+                self._normalize_model_text(brief_result["message"]["content"])
+                if "message" in brief_result
+                else "Unable to generate brief summary"
+            )
+            
+            # Apply text length limits to brief summary
+            if self.max_brief_summary_chars > 0:
+                brief_text = self._truncate_text(brief_text, self.max_brief_summary_chars)
+
             return SummaryResult(
-                detailed=(
-                    detailed_result["message"]["content"]
-                    if "message" in detailed_result
-                    else "Unable to generate detailed summary"
-                ),
-                brief=(
-                    brief_result["message"]["content"]
-                    if "message" in brief_result
-                    else "Unable to generate brief summary"
-                ),
-                timeline=timeline,
-                transcript=transcript,
+                detailed=detailed_text,
+                brief=brief_text,
             ), None
         except Exception as e:
             self.logger.error(f"Error generating summaries: {str(e)}")
             return SummaryResult(
-                detailed="Error generating video summary",
+                detailed="Error generating detailed summary",
                 brief="Error generating brief summary",
-                timeline=timeline,
-                transcript=transcript,
             ), f"Summary generation failed: {str(e)}"
 
     def analyze_video_structured(self, video_path: str) -> AnalysisResult:
         """Provide a comprehensive video analysis using both visual and audio content"""
+        overall_start = time.time()
         self.logger.info(f"Starting video analysis for: {video_path}")
 
         try:
+            # Get video properties
+            video_props_dict = get_video_properties(video_path)
+            video_properties = VideoProperties(**video_props_dict)
+            
             # Extract key frames
+            frame_start = time.time()
             self.logger.info("Selecting key frames")
             frames = self.frame_selector.select_frames(video_path, self)
-            self.logger.info(f"Selected {len(frames)} frames for analysis")
+            frame_time = time.time() - frame_start
+            self.logger.info(f"Selected {len(frames)} frames for analysis in {frame_time:.2f}s")
 
             # Transcribe audio if available
             audio_segments: List[AudioSegment] = []
             warnings: List[str] = []
+            audio_time = 0.0
             if self.audio_transcriber:
+                audio_start = time.time()
                 self.logger.info("Starting audio transcription")
                 try:
                     audio_segments = self.audio_transcriber.transcribe(video_path)
-                    self.logger.info(f"Transcribed {len(audio_segments)} audio segments")
+                    audio_time = time.time() - audio_start
+                    self.logger.info(f"Transcribed {len(audio_segments)} audio segments in {audio_time:.2f}s")
                 except Exception as e:
-                    warning = f"Audio transcription failed: {str(e)}"
+                    audio_time = time.time() - audio_start
+                    warning = f"Audio transcription failed after {audio_time:.2f}s: {str(e)}"
                     warnings.append(warning)
                     self.logger.error(warning)
 
             # Analyze frames with context
             frame_descriptions: List[FrameAnalysis] = []
             context = None
+            frame_analysis_start = time.time()
 
             for i, frame in enumerate(frames):
                 self.logger.info(f"Analyzing frame {i + 1}/{len(frames)} at {frame.timestamp:.2f}s")
@@ -326,20 +598,47 @@ class OllamaVideoAnalyzer:
                 if context_note:
                     frame_prompt = f"{frame_prompt}\n\n{context_note}"
 
+                
                 analysis = self._analyze_frame(frame, frame_prompt)
+                
+                # Analyze quality if enabled
+                if self.analyze_quality:
+                    quality_analysis_text, quality_scores = self._analyze_frame_quality(frame)
+                    analysis.quality_analysis = quality_analysis_text
+                    analysis.quality_scores = quality_scores
+                
                 frame_descriptions.append(analysis)
                 context = analysis.description
                 time.sleep(0.1)  # Rate limiting
 
+            frame_analysis_time = time.time() - frame_analysis_start
+            self.logger.info(f"Frame analysis completed in {frame_analysis_time:.2f}s "
+                           f"({frame_analysis_time/len(frames):.2f}s per frame)")
+
             # Generate summaries with both video and audio
-            fallback_duration = frames[-1].timestamp if frames else 0.0
-            video_duration = get_video_duration(video_path, fallback_duration=fallback_duration)
+            # Calculate duration from video properties when available
+            if video_properties.fps and video_properties.total_frames and video_properties.total_frames > 0:
+                video_duration = video_properties.total_frames / video_properties.fps
+            else:
+                # Fallback to frame timestamp or probe if properties unavailable
+                fallback_duration = frames[-1].timestamp if frames else 0.0
+                video_duration = get_video_duration(video_path, fallback_duration=fallback_duration)
             self.logger.info("Generating video and audio summaries")
+            summary_start = time.time()
             summaries, summary_warning = self._generate_summary(
                 frame_descriptions,
                 audio_segments,
                 video_duration,
             )
+            summary_time = time.time() - summary_start
+            self.logger.info(f"Summary generation completed in {summary_time:.2f}s")
+            
+            # Calculate trim recommendations if quality analysis was performed
+            if self.analyze_quality:
+                self.logger.info("Calculating trim recommendations")
+                trim_recs = self._calculate_trim_recommendations(frame_descriptions, video_duration)
+                summaries.trim_recommendations = trim_recs
+            
             if summary_warning:
                 warnings.append(summary_warning)
 
@@ -361,8 +660,16 @@ class OllamaVideoAnalyzer:
                 models_used=ModelsUsed(
                     frame_analysis=self.frame_analysis_model,
                     summary=self.summary_model,
-                    audio=self.audio_transcriber.__class__.__name__ if self.audio_transcriber else None,
+                    audio=self.audio_transcriber.model_name if self.audio_transcriber else None,
                 ),
+                processing_timings=ProcessingTimings(
+                    frame_selection=frame_time,
+                    audio_transcription=audio_time,
+                    frame_analysis=frame_analysis_time,
+                    summary_generation=summary_time,
+                    total=time.time() - overall_start,
+                ),
+                video_properties=video_properties,
             )
             result = AnalysisResult(
                 summary=summaries,
@@ -372,7 +679,13 @@ class OllamaVideoAnalyzer:
                 warnings=warnings,
             )
 
-            self.logger.info("Video and audio analysis completed successfully")
+            overall_time = time.time() - overall_start
+            self.logger.info(f"Video and audio analysis completed in {overall_time:.2f}s total")
+            self.logger.info(f"  Frame selection: {frame_time:.2f}s")
+            if audio_time > 0:
+                self.logger.info(f"  Audio transcription: {audio_time:.2f}s")
+            self.logger.info(f"  Frame analysis: {frame_analysis_time:.2f}s")
+            self.logger.info(f"  Summary generation: {summary_time:.2f}s")
             return result
 
         except Exception as e:

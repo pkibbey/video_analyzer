@@ -3,6 +3,7 @@ from transformers import WhisperProcessor, WhisperForConditionalGeneration
 from typing import List, Dict, Tuple, Optional, Callable
 import numpy as np
 import logging
+import time
 import torch
 import ffmpeg
 import re
@@ -64,12 +65,14 @@ class WhisperTranscriber(AudioTranscriber):
             beam_size: int = 1,
             temperature: Optional[float] = None,
             condition_on_prev_tokens: Optional[bool] = None,
+            local_files_only: bool = True,
     ):
         super().__init__()
         if device is None:
             device = "cuda:0" if torch.cuda.is_available() else "cpu"
 
         self.logger.info(f"Initializing Whisper transcriber with model {model_name} on {device}")
+        self.model_name = model_name
         self.device = device
         self.language = language
         self.task = task
@@ -82,16 +85,24 @@ class WhisperTranscriber(AudioTranscriber):
         self.condition_on_prev_tokens = condition_on_prev_tokens
 
         # Initialize processor and model
-        self.processor = WhisperProcessor.from_pretrained(model_name)
-        self.model = WhisperForConditionalGeneration.from_pretrained(model_name)
-        self.model.to(device)
+        self.processor = WhisperProcessor.from_pretrained(model_name, local_files_only=local_files_only)
+        self.model = WhisperForConditionalGeneration.from_pretrained(model_name, local_files_only=local_files_only)
+
+        # Force consistent dtype semantics for model + inputs:
+        # - on CPU, use float32 always (Whisper float16 on CPU can cause dtype mismatch in some libs)
+        # - on CUDA, preserve model dtype and cast inputs accordingly
+        self.model = self.model.to(device)
+        if device.startswith("cpu") and self.model.dtype == torch.float16:
+            self.model = self.model.to(torch.float32)
+
+        self.model_dtype = self.model.dtype
+        self.device = device
+
         self.model.eval()
 
-        # Disable forced decoder ids
+        # Disable forced decoder ids and let generation handle language/task to avoid duplicate logits processors
         self.model.config.forced_decoder_ids = None
         self.model.generation_config.forced_decoder_ids = None
-        self.model.generation_config.language = language
-        self.model.generation_config.task = task
 
         # Target sampling rate for Whisper
         self.target_sampling_rate = 16000
@@ -156,13 +167,41 @@ class WhisperTranscriber(AudioTranscriber):
 
         return segments
 
+    def _is_speech_present(self, transcription: str) -> bool:
+        if not transcription or not transcription.strip():
+            return False
+
+        tokens = re.findall(r"[a-zA-Z0-9']+", transcription)
+        if len(tokens) < 2:
+            return False
+
+        # Avoid noiseful output where the model hallucinates low-meaning or repeated noise
+        unique_ratio = len(set(tokens)) / len(tokens)
+        if unique_ratio < 0.2:
+            return False
+
+        alpha_chars = re.findall(r"[a-zA-Z]", transcription)
+        alpha_ratio = len(alpha_chars) / max(1, len(transcription))
+        if alpha_ratio < 0.35:
+            return False
+
+        # If text is all punctuation/unknown, treat as no speech
+        if all(not re.match(r"[a-zA-Z0-9]", ch) for ch in transcription):
+            return False
+
+        return True
+
     def transcribe(self, video_path: str) -> List[AudioSegment]:
         """Transcribe audio from video file using Whisper"""
+        transcribe_start = time.time()
         self.logger.info(f"Starting audio transcription for {video_path}")
 
         try:
             # Extract audio
+            extract_start = time.time()
             audio_array, original_sampling_rate = self._extract_audio(video_path)
+            extract_time = time.time() - extract_start
+            self.logger.info(f"Audio extraction took {extract_time:.2f}s")
 
             # Segment audio into manageable chunks
             audio_segments = self._segment_audio(
@@ -172,9 +211,12 @@ class WhisperTranscriber(AudioTranscriber):
             )
 
             transcribed_segments = []
+            process_start = time.time()
 
             # Process each audio segment
-            for segment_audio, start_time in audio_segments:
+            for idx, (segment_audio, start_time) in enumerate(audio_segments):
+                segment_proc_start = time.time()
+                
                 # Prepare features
                 features = self.processor(
                     [segment_audio],
@@ -183,6 +225,11 @@ class WhisperTranscriber(AudioTranscriber):
                     return_attention_mask=True,
                 )
                 input_features = features.input_features.to(self.device)
+
+                # Ensure model and input types match (prevents float/half mismatch errors)
+                if hasattr(self, 'model_dtype') and self.model_dtype is not None:
+                    input_features = input_features.to(self.model_dtype)
+
                 attention_mask = features.get("attention_mask")
                 if attention_mask is not None:
                     attention_mask = attention_mask.to(self.device)
@@ -200,8 +247,8 @@ class WhisperTranscriber(AudioTranscriber):
                     generate_kwargs["do_sample"] = False
                 if self.temperature is not None:
                     generate_kwargs["temperature"] = self.temperature
-                if self.condition_on_prev_tokens is not None:
-                    generate_kwargs["condition_on_prev_tokens"] = self.condition_on_prev_tokens
+                # Note: condition_on_prev_tokens is not a standard generate() kwarg for Whisper
+                # and causes warnings; removed from generation kwargs
 
                 with torch.inference_mode():
                     predicted_ids = self.model.generate(input_features, **generate_kwargs)
@@ -219,6 +266,10 @@ class WhisperTranscriber(AudioTranscriber):
                         max_phrase_words=self.max_repeat_phrase_words,
                     )
 
+                # Normalize no-speech / noise-only output
+                if not self._is_speech_present(transcription):
+                    transcription = None
+
                 # Calculate segment duration
                 duration = len(segment_audio) / self.target_sampling_rate
 
@@ -231,10 +282,16 @@ class WhisperTranscriber(AudioTranscriber):
                 )
 
                 transcribed_segments.append(segment)
+                segment_time = time.time() - segment_proc_start
+                self.logger.info(f"Segment {idx + 1}/{len(audio_segments)} processed in {segment_time:.2f}s")
 
-            self.logger.info(f"Transcription completed: {len(transcribed_segments)} segments")
+            process_time = time.time() - process_start
+            total_time = time.time() - transcribe_start
+            self.logger.info(f"Transcription completed: {len(transcribed_segments)} segments in {total_time:.2f}s "
+                           f"(processing: {process_time:.2f}s, extraction: {extract_time:.2f}s)")
             return transcribed_segments
 
         except Exception as e:
-            self.logger.error(f"Transcription failed: {str(e)}")
+            elapsed = time.time() - transcribe_start
+            self.logger.error(f"Transcription failed after {elapsed:.2f}s: {str(e)}")
             raise TranscriptionError(f"Transcription failed: {str(e)}") from e

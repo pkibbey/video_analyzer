@@ -22,7 +22,22 @@
       ],
       "properties": {
         "detailed": {
-          "type": "string"
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "objective_summary": {
+              "type": "string"
+            },
+            "visual_observations": {
+              "type": "string"
+            },
+            "audio_transcript": {
+              "type": "string"
+            },
+            "sequence_of_events": {
+              "type": "string"
+            }
+          }
         },
         "brief": {
           "type": "string"
