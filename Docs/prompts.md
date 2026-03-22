@@ -1,7 +1,9 @@
 
-# Innovative Video Analysis Prompt Examples for VideoAnalyzer
+# Video Analysis Prompt Examples for Personal and Semi-Professional Content
 
-Harness the full potential of **VideoAnalyzer** with these innovative video analysis prompt examples. These prompts are categorized into **Frame-Based Analysis**, **Detailed Summaries**, and **Brief Summaries** to align with VideoAnalyzer's `AnalysisPrompts` structure. Each example includes a detailed description and potential use cases to inspire your projects.
+**Note:** These prompts are optimized for analyzing personal video content created by semi-professional users—including travel vlogs, pet videos, sports footage, festival coverage, fireworks displays, and videos of friends and family gatherings.
+
+Harness the full potential of **VideoAnalyzer** with these innovative video analysis prompt examples. These prompts are categorized into **Frame-Based Analysis**, **Detailed Summaries**, and **Brief Summaries** to align with VideoAnalyzer's `AnalysisPrompts` structure. Each example includes a detailed description and potential use cases tailored for semi-professional personal content creators.
 
 ---
 
@@ -30,9 +32,9 @@ Frame-based analysis focuses on extracting detailed information from individual 
 This prompt directs the model to meticulously identify objects within a frame and understand their interactions and actions, providing a detailed snapshot of the scene.
 
 **Use Cases:**
-- **Security Surveillance:** Detect and describe suspicious activities in real-time.
-- **Retail Analytics:** Monitor customer interactions with products on shelves.
-- **Autonomous Vehicles:** Identify obstacles and actions within the vehicle’s environment.
+- **Travel Vlogging:** Identify landmarks, activities, and interactions at travel destinations.
+- **Pet Videos:** Detect pet behaviors, tricks, and interactions with people and environment.
+- **Event Documentation:** Analyze crowd interactions and key activities at festivals, sports events, and celebrations.
 
 ---
 
@@ -46,9 +48,9 @@ This prompt directs the model to meticulously identify objects within a frame an
 Focuses on interpreting the emotional states of individuals within a frame by analyzing visual cues such as facial expressions and body language.
 
 **Use Cases:**
-- **Market Research:** Gauge consumer reactions to products or advertisements.
-- **Mental Health:** Analyze patient expressions in therapeutic settings.
-- **Entertainment:** Assess character emotions in film and television.
+- **Social Content Creation:** Capture genuine emotional moments in personal videos for storytelling.
+- **Memory Preservation:** Document emotional highlights from family gatherings, parties, and celebrations.
+- **Sports Highlights:** Identify emotional peaks and reactions during sports events and competitions.
 
 ---
 
@@ -62,9 +64,9 @@ Focuses on interpreting the emotional states of individuals within a frame by an
 Encourages the model to evaluate the broader environmental context of a frame, understanding how elements like lighting and weather influence the scene's mood.
 
 **Use Cases:**
-- **Film Production:** Evaluate shooting conditions and their impact on scene aesthetics.
-- **Virtual Reality:** Enhance realistic environment rendering based on contextual analysis.
-- **Environmental Monitoring:** Detect and report on environmental changes in real-time footage.
+- **Travel Content:** Assess lighting and weather conditions in various destinations for visual quality insight.
+- **Festival and Event Filming:** Understand how environmental factors contribute to the atmosphere and mood.
+- **Outdoor Sports Coverage:** Evaluate weather, lighting, and terrain impacts on video quality and storytelling.
 
 ---
 
@@ -78,9 +80,9 @@ Encourages the model to evaluate the broader environmental context of a frame, u
 Aims to dissect the flow of actions within a frame, pinpointing key movements that drive the story forward.
 
 **Use Cases:**
-- **Sports Analytics:** Analyze player movements and strategies during games.
-- **Instructional Videos:** Break down complex tasks into actionable steps.
-- **Animation Studios:** Ensure continuity and accuracy in character movements.
+- **Sports Analysis:** Break down plays, tricks, and skill demonstrations in sports footage.
+- **Pet Training Content:** Document behavioral sequences and tricks for instructional clips.
+- **Event Highlights:** Identify and sequence pivotal moments like fireworks displays or performance routines.
 
 ---
 
@@ -94,9 +96,9 @@ Aims to dissect the flow of actions within a frame, pinpointing key movements th
 Focuses on the artistic aspects of a frame, assessing how color and composition contribute to the overall quality and narrative.
 
 **Use Cases:**
-- **Art Critique:** Provide feedback on visual elements in creative projects.
-- **Advertising:** Optimize color schemes for better audience engagement.
-- **Content Creation:** Enhance video aesthetics through informed compositional choices.
+- **Content Enhancement:** Analyze composition and color to improve semi-professional video aesthetics.
+- **Instagram/TikTok Optimization:** Evaluate visual appeal for social media sharing and engagement.
+- **Seasonal Content:** Assess how color palettes enhance the mood of travel, festival, and celebration videos.
 
 ---
 
@@ -114,9 +116,9 @@ Detailed summaries provide an in-depth overview of the video's content, integrat
 This prompt encourages the generation of a thorough and cohesive storyline by combining visual actions with audio transcripts, ensuring a complete depiction of the video.
 
 **Use Cases:**
-- **Content Creation:** Develop scripts or storyboards from existing footage.
-- **Educational Platforms:** Provide detailed summaries of instructional videos for better learner comprehension.
-- **Film and Media Studies:** Analyze and document movie plots for reviews or academic purposes.
+- **Vlog Scripting:** Create narrative-driven scripts from personal footage for YouTube or TikTok.
+- **Travel Guides:** Generate comprehensive travelogue content from raw destination footage.
+- **Memory Documentation:** Develop detailed narratives of family events, celebrations, and adventures for archival or sharing.
 
 ---
 
@@ -130,9 +132,9 @@ This prompt encourages the generation of a thorough and cohesive storyline by co
 Focuses on identifying and explaining the core themes of the video, illustrating how different elements work together to communicate deeper messages.
 
 **Use Cases:**
-- **Literary Analysis:** Examine themes in narrative videos or films.
-- **Marketing:** Understand and leverage thematic elements for targeted advertising.
-- **Social Research:** Analyze media content to extract societal messages and trends.
+- **Personal Storytelling:** Identify underlying themes and narratives in travel, pet, and family footage.
+- **Social Content Strategy:** Understand thematic elements for YouTube, Instagram, and TikTok content creation.
+- **Event Recaps:** Extract key themes and moments from festivals, celebrations, and sports events.
 
 ---
 
@@ -146,9 +148,9 @@ Focuses on identifying and explaining the core themes of the video, illustrating
 Aims to capture the evolution of characters and their relationships, offering insights into their development and interactions within the video.
 
 **Use Cases:**
-- **Screenwriting:** Assess character arcs and interactions for storytelling purposes.
-- **Psychology:** Study character behaviors and relationships for research.
-- **Interactive Media:** Enhance character-driven narratives in games and simulations.
+- **Pet Content:** Document pet personality development and interactions across multiple videos.
+- **Family Documentation:** Track relationship dynamics and interactions during family gatherings and milestones.
+- **Social Content Narratives:** Develop consistent character/persona storytelling across personal video series.
 
 ---
 
@@ -162,9 +164,9 @@ Aims to capture the evolution of characters and their relationships, offering in
 Encourages the model to map out the progression of events, ensuring a logical flow and contextual connections throughout the video's timeline.
 
 **Use Cases:**
-- **Project Management:** Document project milestones and progress from meeting recordings.
-- **Historical Analysis:** Summarize events from documentary footage.
-- **Event Planning:** Outline sequences from event recordings for future planning.
+- **Travel Vlogs:** Document the sequence of destinations and activities for narrative flow.
+- **Festival and Event Coverage:** Outline the progression of performances, activities, and highlights.
+- **Pet Milestones:** Sequence significant behavioral moments and life events from pet footage.
 
 ---
 
@@ -178,9 +180,9 @@ Encourages the model to map out the progression of events, ensuring a logical fl
 Focuses on merging both modalities—visual and audio—to create a unified and comprehensive summary that reflects the complete context of the video.
 
 **Use Cases:**
-- **Content Archiving:** Create detailed records of multimedia content for archives.
-- **Accessibility Tools:** Provide comprehensive descriptions for visually impaired users.
-- **Media Production:** Summarize content for stakeholders and team members.
+- **Personal Video Archives:** Create detailed records of family events, travel, and celebrations for long-term preservation.
+- **Social Media Captions:** Generate comprehensive descriptions for YouTube, Instagram, and other platforms.
+- **Shareable Content:** Synthesize multi-modal summaries for sharing with friends and family members.
 
 ---
 
@@ -198,9 +200,9 @@ Brief summaries offer concise overviews of the video's content, highlighting the
 Generates a short and clear summary that captures the essential aspects of the video, making it easy to grasp the primary content quickly.
 
 **Use Cases:**
-- **Social Media:** Create quick video descriptions for platforms like Twitter or Instagram.
-- **Content Previews:** Offer brief overviews for video libraries or streaming services.
-- **Executive Summaries:** Provide high-level insights for stakeholders and decision-makers.
+- **Social Media Posts:** Create quick captions for Instagram, TikTok, and YouTube videos.
+- **Content Previews:** Generate brief descriptions for video collections and multi-video series.
+- **Quick Sharing:** Provide concise summaries for quick messaging and social sharing with friends.
 
 ---
 
@@ -214,9 +216,9 @@ Generates a short and clear summary that captures the essential aspects of the v
 Emphasizes the most significant and impactful parts of the video, delivering a summary that highlights the core messages and memorable moments.
 
 **Use Cases:**
-- **News Outlets:** Create brief summaries of news clips for quick consumption.
-- **Marketing:** Highlight key product features or campaign messages.
-- **Event Recaps:** Offer concise overviews of events for attendee follow-ups.
+- **Event Highlights:** Create reels of key moments from festivals, sports, and celebrations.
+- **Pet Trick Compilation:** Highlight the best moments from pet videos for social sharing.
+- **Travel Montages:** Summarize destination highlights for quick-view content series.
 
 ---
 
@@ -230,9 +232,9 @@ Emphasizes the most significant and impactful parts of the video, delivering a s
 Aims to present the main insights and lessons from the video, ensuring that viewers can quickly grasp the fundamental points.
 
 **Use Cases:**
-- **Educational Content:** Provide students with quick takeaways from lecture videos.
-- **Business Analytics:** Summarize meeting recordings for actionable insights.
-- **Content Curation:** Offer brief insights for curated content lists or newsletters.
+- **Travel Insights:** Extract main discoveries and experiences from travel footage.
+- **Pet Behavior Tips:** Summarize key behaviors and learnings from pet videos.
+- **Content Curation:** Provide brief insights for personal video collections and themed playlists.
 
 ---
 
@@ -246,9 +248,9 @@ Aims to present the main insights and lessons from the video, ensuring that view
 Tailored for executives and decision-makers, this prompt focuses on delivering strategic and critical information in a brief format.
 
 **Use Cases:**
-- **Business Reports:** Summarize corporate presentations or quarterly reviews.
-- **Strategic Planning:** Provide overviews of strategy sessions or planning meetings.
-- **Board Meetings:** Offer concise summaries of board discussions and decisions.
+- **Content Planning:** Summarize key moments from events for future video planning.
+- **Memory Snapshots:** Create brief summaries of important family and celebration moments.
+- **Social Media Strategy:** Identify key content angles from personal footage for posting strategy.
 
 ---
 
@@ -262,9 +264,9 @@ Tailored for executives and decision-makers, this prompt focuses on delivering s
 Delivers a quick and clear snapshot of the video's content, ideal for situations where brevity and clarity are paramount.
 
 **Use Cases:**
-- **Content Indexing:** Create brief entries for video catalogs or databases.
-- **Email Newsletters:** Include quick video summaries for subscriber updates.
-- - **Mobile Viewing:** Provide concise summaries optimized for quick reading on mobile devices.
+- **Video Tagging:** Create brief tags and descriptions for organizing personal video libraries.
+- **Social Media Stories:** Generate quick summaries for Instagram Stories, Reels, and TikTok clips.
+- **Message Sharing:** Provide concise one-liner summaries for sending video clips to friends and family.
 
 ---
 
@@ -304,8 +306,8 @@ custom_prompts = AnalysisPrompts(
 
 # Initialize the video analyzer
 analyzer = OllamaVideoAnalyzer(
-    frame_analysis_model="ministral-3:3b-cloud",
-    summary_model="ministral-3:3b-cloud",
+    frame_analysis_model="ministral-3:3b",
+    summary_model="ministral-3:14b",
     prompts=custom_prompts,
     min_frames=8,
     max_frames=32,
