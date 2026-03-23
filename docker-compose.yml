@@ -1,0 +1,23 @@
+version: "3.9"
+
+services:
+  video-analyzer:
+    build: .
+    image: video-analyzer:latest
+    container_name: video-analyzer
+    ports:
+      - "3002:3002"
+    environment:
+      - PYTHONUNBUFFERED=1
+      # Set your HF token if needed. If you're using local-only Whisper prior to model download, this may not be required.
+      - HF_TOKEN=${HF_TOKEN:-}
+    volumes:
+      - ./:/app:cached
+      - jobs-data:/app/.jobs.db
+      - video-data:/app/videos
+    command: ["video-analyzer-api", "--host", "0.0.0.0", "--port", "3002"]
+    restart: unless-stopped
+
+volumes:
+  jobs-data:
+  video-data:
