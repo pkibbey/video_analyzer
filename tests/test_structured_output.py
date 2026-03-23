@@ -11,12 +11,7 @@ from video_analyzer.models import (
 
 def _build_result() -> AnalysisResult:
     summary = SummaryResult(
-        detailed={
-            "objective_summary": "Test objective",
-            "visual_observations": "Test observations",
-            "audio_transcript": "Test transcript",
-            "sequence_of_events": "Test sequence"
-        },
+        detailed="Objective: Test objective\nVisual: Test observations\nAudio: Test transcript\nSequence: Test sequence",
         brief="brief summary",
     )
     frames = [
@@ -36,6 +31,9 @@ def _build_result() -> AnalysisResult:
         scene_distribution={"static": 1, "transition": 1, "action": 0},
         models_used=ModelsUsed(frame_analysis="vision", summary="summary", audio="audio"),
     )
+    summary.timeline = "test timeline"
+    summary.transcript = "test transcript"
+
     return AnalysisResult(
         summary=summary,
         frame_analyses=frames,
@@ -50,6 +48,8 @@ def test_analysis_result_to_dict():
     structured = result.to_dict()
 
     assert structured["summary"]["brief"] == "brief summary"
+    assert structured["summary"]["timeline"] == "test timeline"
+    assert structured["summary"]["transcript"] == "test transcript"
     assert structured["frame_analyses"][1]["error"] == "timeout"
     assert structured["metadata"]["models_used"]["frame_analysis"] == "vision"
 
@@ -58,7 +58,7 @@ def test_analysis_result_to_legacy_dict():
     result = _build_result()
     legacy = result.to_legacy_dict()
 
-    # Legacy format combines structured detailed into a narrative
+    # Legacy format combines detailed summary text as-is
     assert "Test objective" in legacy["summary"]
     assert "Test observations" in legacy["summary"]
     assert legacy["brief_summary"] == "brief summary"
@@ -71,3 +71,7 @@ def test_analysis_result_schema_structure():
     schema = analysis_result_schema()
     assert schema["title"] == "AnalysisResult"
     assert "summary" in schema["properties"]
+    summary_props = schema["properties"]["summary"]["properties"]
+    assert "timeline" in summary_props
+    assert "transcript" in summary_props
+    assert "file_size" in schema["properties"]["metadata"]["properties"]["video_properties"]["properties"]

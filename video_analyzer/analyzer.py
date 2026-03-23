@@ -215,7 +215,7 @@ class OllamaVideoAnalyzer:
                 if attempt >= attempts:
                     raise
                 self.logger.warning(
-                    "Ollama %s request failed (attempt %s/%s): %s",
+                    "Ollama %s request unanalyzed (attempt %s/%s): %s",
                     request_label,
                     attempt,
                     attempts,
@@ -276,14 +276,14 @@ class OllamaVideoAnalyzer:
                 error=str(e),
             )
 
-    def _analyze_frame_quality(self, frame: Frame) -> Tuple[Optional[Union[Dict[str, Any], str]], Optional[Dict[str, Any]]]:
+    def _analyze_frame_quality(self, frame: Frame) -> Tuple[Optional[str], Optional[str]]:
         """Analyze frame quality metrics for editing usability.
-        
+
         Returns:
-            Tuple of (quality_analysis_text, quality_scores_dict)
+            Tuple of (quality_analysis_text, quality_scores_text)
         """
         base64_image = self._frame_to_base64(frame.image)
-        
+
         messages = []
         if self.prompts.quality_analysis_system:
             messages.append({"role": "system", "content": self.prompts.quality_analysis_system})
@@ -301,16 +301,9 @@ class OllamaVideoAnalyzer:
             if "message" in result:
                 raw_quality_text = result["message"]["content"]
                 quality_text = self._normalize_model_text(raw_quality_text)
-                quality_scores = self._extract_quality_scores_from_text(quality_text)
 
-                if quality_scores is not None:
-                    # Store parsed JSON object for quality_analysis + quality_scores
-                    return quality_scores, quality_scores
-
-                self.logger.warning(
-                    f"Could not parse quality scores at {frame.timestamp}s; storing quality analysis object with raw text."
-                )
-                return {"raw_quality_analysis": quality_text}, None
+                # Store raw output as strings for both quality_analysis and quality_scores.
+                return quality_text, quality_text
             else:
                 raise Exception("Invalid response format")
         except Exception as e:
@@ -384,88 +377,6 @@ class OllamaVideoAnalyzer:
 
         return normalized
 
-    def _calculate_trim_recommendations(self, frame_analyses: List[FrameAnalysis], video_duration: float) -> Dict[str, any]:
-        """Calculate trim point recommendations based on frame quality scores"""
-        def _to_float_quality(value: Any) -> float:
-            if isinstance(value, (int, float)):
-                return float(value)
-            if isinstance(value, str):
-                value = value.strip()
-                if not value:
-                    return 0.0
-                # Support values like "7", "7.5", "7/10"
-                try:
-                    return float(value)
-                except ValueError:
-                    if "/" in value:
-                        parts = value.split("/")
-                        try:
-                            num = float(parts[0].strip())
-                            den = float(parts[1].strip()) if len(parts) > 1 and parts[1].strip() else 1.0
-                            return (num / den) * 10.0 if den != 0 else num
-                        except ValueError:
-                            pass
-            return 0.0
-
-        quality_timeline = []
-        for analysis in frame_analyses:
-            if analysis.quality_scores:
-                quality_timeline.append({
-                    "timestamp": analysis.timestamp,
-                    "overall_quality": _to_float_quality(analysis.quality_scores.get("overall_quality", 5)),
-                    "issues": analysis.quality_scores.get("issues", [])
-                })
-        
-        if not quality_timeline:
-            return {}
-        
-        # Sort by timestamp
-        quality_timeline.sort(key=lambda x: x["timestamp"])
-        
-        # Find trim points (start and end of usable content)
-        # Quality threshold for "usable" content
-        quality_threshold = 4  # out of 10
-        
-        usable_regions = []
-        current_start = None
-        
-        for idx, item in enumerate(quality_timeline):
-            if item["overall_quality"] >= quality_threshold:
-                if current_start is None:
-                    current_start = item["timestamp"]
-            else:
-                if current_start is not None:
-                    end_ts = quality_timeline[idx - 1]["timestamp"] if idx > 0 else item["timestamp"]
-                    usable_regions.append({
-                        "start": current_start,
-                        "end": end_ts
-                    })
-                    current_start = None
-        
-        # Close final region if still open
-        if current_start is not None:
-            usable_regions.append({
-                "start": current_start,
-                "end": quality_timeline[-1]["timestamp"]
-            })
-        
-        # Find best region (longest high-quality section)
-        best_region = max(usable_regions, key=lambda x: x["end"] - x["start"]) if usable_regions else None
-        
-        # Identify problem zones
-        problem_zones = [item for item in quality_timeline if item["issues"]]
-        
-        return {
-            "quality_timeline": quality_timeline,
-            "recommended_trim": {
-                "start": best_region["start"] if best_region else 0,
-                "end": best_region["end"] if best_region else video_duration
-            } if best_region else None,
-            "usable_regions": usable_regions,
-            "problem_zones": problem_zones,
-            "analysis_note": "Trim recommendations based on visual quality assessment across frames"
-        }
-
     def _generate_summary(
         self,
         frame_descriptions: List[FrameAnalysis],
@@ -530,13 +441,15 @@ class OllamaVideoAnalyzer:
             return SummaryResult(
                 detailed=detailed_text,
                 brief=brief_text,
+                timeline=timeline,
+                transcript=transcript,
             ), None
         except Exception as e:
             self.logger.error(f"Error generating summaries: {str(e)}")
             return SummaryResult(
                 detailed="Error generating detailed summary",
                 brief="Error generating brief summary",
-            ), f"Summary generation failed: {str(e)}"
+            ), f"Summary generation unanalyzed: {str(e)}"
 
     def analyze_video_structured(self, video_path: str) -> AnalysisResult:
         """Provide a comprehensive video analysis using both visual and audio content"""
@@ -568,7 +481,7 @@ class OllamaVideoAnalyzer:
                     self.logger.info(f"Transcribed {len(audio_segments)} audio segments in {audio_time:.2f}s")
                 except Exception as e:
                     audio_time = time.time() - audio_start
-                    warning = f"Audio transcription failed after {audio_time:.2f}s: {str(e)}"
+                    warning = f"Audio transcription unanalyzed after {audio_time:.2f}s: {str(e)}"
                     warnings.append(warning)
                     self.logger.error(warning)
 
@@ -612,7 +525,7 @@ class OllamaVideoAnalyzer:
                 time.sleep(0.1)  # Rate limiting
 
             frame_analysis_time = time.time() - frame_analysis_start
-            self.logger.info(f"Frame analysis completed in {frame_analysis_time:.2f}s "
+            self.logger.info(f"Frame analysis analyzed in {frame_analysis_time:.2f}s "
                            f"({frame_analysis_time/len(frames):.2f}s per frame)")
 
             # Generate summaries with both video and audio
@@ -631,14 +544,8 @@ class OllamaVideoAnalyzer:
                 video_duration,
             )
             summary_time = time.time() - summary_start
-            self.logger.info(f"Summary generation completed in {summary_time:.2f}s")
-            
-            # Calculate trim recommendations if quality analysis was performed
-            if self.analyze_quality:
-                self.logger.info("Calculating trim recommendations")
-                trim_recs = self._calculate_trim_recommendations(frame_descriptions, video_duration)
-                summaries.trim_recommendations = trim_recs
-            
+            self.logger.info(f"Summary generation analyzed in {summary_time:.2f}s")
+
             if summary_warning:
                 warnings.append(summary_warning)
 
@@ -650,7 +557,7 @@ class OllamaVideoAnalyzer:
 
             frame_errors = [analysis for analysis in frame_descriptions if analysis.error]
             if frame_errors:
-                warnings.append(f"{len(frame_errors)} frame analyses failed.")
+                warnings.append(f"{len(frame_errors)} frame analyses unanalyzed.")
 
             metadata = AnalysisMetadata(
                 num_frames_analyzed=len(frames),
@@ -680,7 +587,7 @@ class OllamaVideoAnalyzer:
             )
 
             overall_time = time.time() - overall_start
-            self.logger.info(f"Video and audio analysis completed in {overall_time:.2f}s total")
+            self.logger.info(f"Video and audio analysis analyzed in {overall_time:.2f}s total")
             self.logger.info(f"  Frame selection: {frame_time:.2f}s")
             if audio_time > 0:
                 self.logger.info(f"  Audio transcription: {audio_time:.2f}s")

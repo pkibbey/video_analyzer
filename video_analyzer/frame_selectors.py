@@ -84,7 +84,7 @@ class DynamicFrameSelector(FrameSelector):
         frames = self._extract_frames(cap, target_frames, scene_changes)
 
         cap.release()
-        self.logger.info(f"Dynamic frame selection completed. Selected {len(frames)} frames")
+        self.logger.info(f"Dynamic frame selection analyzed. Selected {len(frames)} frames")
         return frames
 
     def _detect_scene_changes(self, video_path: str, cap: cv2.VideoCapture) -> List[float]:
@@ -158,7 +158,7 @@ class UniformFrameSelector(FrameSelector):
         frames = self._extract_uniform_frames(cap, target_frames, fps)
 
         cap.release()
-        self.logger.info(f"Uniform frame selection completed. Selected {len(frames)} frames")
+        self.logger.info(f"Uniform frame selection analyzed. Selected {len(frames)} frames")
         return frames
 
     def _extract_uniform_frames(self, cap: cv2.VideoCapture, target_frames: int, fps: float) -> List[Frame]:
@@ -198,7 +198,7 @@ class AllFrameSelector(FrameSelector):
 
         frames = self._extract_all_frames(cap, fps)
         cap.release()
-        self.logger.info(f"All frame selection completed. Selected {len(frames)} frames")
+        self.logger.info(f"All frame selection analyzed. Selected {len(frames)} frames")
         return frames
 
     def _extract_all_frames(self, cap: cv2.VideoCapture, fps: float) -> List[Frame]:

@@ -25,6 +25,7 @@ def get_video_properties(video_path: str) -> Dict[str, Any]:
         "data_rate": None,
         "audio_codec": None,
         "audio_sample_rate": None,
+        "file_size": None,
         "file_modified_date": None,
         "file_created_date": None,
     }
@@ -32,6 +33,7 @@ def get_video_properties(video_path: str) -> Dict[str, Any]:
     # Extract file date information
     try:
         stat = os.stat(video_path)
+        properties["file_size"] = stat.st_size
         # File modification date
         mtime = datetime.fromtimestamp(stat.st_mtime)
         properties["file_modified_date"] = mtime.isoformat()
@@ -40,6 +42,13 @@ def get_video_properties(video_path: str) -> Dict[str, Any]:
         properties["file_created_date"] = ctime.isoformat()
     except Exception as exc:
         logger.debug("Failed to extract file dates: %s", exc)
+
+    # Fallback: explicit file size with os.path.getsize in case os.stat did not work
+    if properties["file_size"] is None and os.path.exists(video_path):
+        try:
+            properties["file_size"] = os.path.getsize(video_path)
+        except Exception as exc:
+            logger.debug("Failed to recover file size via os.path.getsize: %s", exc)
     
     # Try to get properties using ffprobe first (more reliable)
     try:
@@ -77,7 +86,7 @@ def get_video_properties(video_path: str) -> Dict[str, Any]:
             properties["audio_codec"] = audio_stream.get("codec_name")
             properties["audio_sample_rate"] = int(audio_stream.get("sample_rate", 0)) if audio_stream.get("sample_rate") else None
     except Exception as exc:
-        logger.debug("ffprobe lookup failed: %s", exc)
+        logger.debug("ffprobe lookup unanalyzed: %s", exc)
     
     # Fill in missing properties using cv2
     cap = cv2.VideoCapture(video_path)
@@ -125,7 +134,7 @@ def _probe_duration_ffmpeg(video_path: str) -> Optional[float]:
         value = float(info["format"]["duration"])
         return value if value > 0 else None
     except Exception as exc:
-        logger.debug("ffprobe duration lookup failed: %s", exc)
+        logger.debug("ffprobe duration lookup unanalyzed: %s", exc)
         return None
 
 

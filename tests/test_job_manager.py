@@ -33,7 +33,7 @@ class TestJobCreation:
         
         assert job.job_id is not None
         assert job.video_path == "test_video.mp4"
-        assert job.status == JobStatus.PENDING
+        assert job.status == JobStatus.ANALYZING
         assert job.created_at is not None
         assert job.started_at is None
         assert job.completed_at is None
@@ -104,12 +104,12 @@ class TestJobRetrieval:
 
 class TestJobStatusUpdate:
     def test_update_job_to_processing(self, job_manager):
-        """Test updating job status to PROCESSING."""
+        """Test updating job status to ANALYZING."""
         job = job_manager.create_job("test_video.mp4")
-        updated_job = job_manager.update_job_status(job.job_id, JobStatus.PROCESSING)
+        updated_job = job_manager.update_job_status(job.job_id, JobStatus.ANALYZING)
         
         assert updated_job is not None
-        assert updated_job.status == JobStatus.PROCESSING
+        assert updated_job.status == JobStatus.ANALYZING
         assert updated_job.started_at is not None
 
     def test_update_job_to_completed(self, job_manager):
@@ -117,11 +117,11 @@ class TestJobStatusUpdate:
         job = job_manager.create_job("test_video.mp4")
         result = {"summary": "Test summary", "frames": []}
         updated_job = job_manager.update_job_status(
-            job.job_id, JobStatus.COMPLETED, result=result
+            job.job_id, JobStatus.ANALYZED, result=result
         )
         
         assert updated_job is not None
-        assert updated_job.status == JobStatus.COMPLETED
+        assert updated_job.status == JobStatus.ANALYZED
         assert updated_job.result == result
         assert updated_job.completed_at is not None
 
@@ -150,19 +150,19 @@ class TestJobStatusUpdate:
     def test_update_nonexistent_job(self, job_manager):
         """Test updating a nonexistent job returns None."""
         updated_job = job_manager.update_job_status(
-            "nonexistent_id", JobStatus.PROCESSING
+            "nonexistent_id", JobStatus.ANALYZING
         )
         assert updated_job is None
 
     def test_started_at_not_reset(self, job_manager):
         """Test started_at is only set once."""
         job = job_manager.create_job("test_video.mp4")
-        job_processing = job_manager.update_job_status(job.job_id, JobStatus.PROCESSING)
+        job_processing = job_manager.update_job_status(job.job_id, JobStatus.ANALYZING)
         started_at_first = job_processing.started_at
         
         # Update to another status
         job_completed = job_manager.update_job_status(
-            job.job_id, JobStatus.COMPLETED
+            job.job_id, JobStatus.ANALYZED
         )
         
         assert job_completed.started_at == started_at_first
@@ -174,14 +174,14 @@ class TestAnalysisJobModel:
         job = AnalysisJob(
             job_id="test_id",
             video_path="test.mp4",
-            status=JobStatus.COMPLETED,
+            status=JobStatus.ANALYZED,
             result={"data": "test"},
         )
         job_dict = job.to_dict()
         
         assert job_dict["job_id"] == "test_id"
         assert job_dict["video_path"] == "test.mp4"
-        assert job_dict["status"] == "completed"
+        assert job_dict["status"] == "analyzed"
         assert job_dict["result"] == {"data": "test"}
         assert isinstance(job_dict["created_at"], str)
 
@@ -191,7 +191,7 @@ class TestAnalysisJobModel:
         job = AnalysisJob(
             job_id="test_id",
             video_path="test.mp4",
-            status=JobStatus.COMPLETED,
+            status=JobStatus.ANALYZED,
             started_at=now,
             completed_at=now,
         )
@@ -255,7 +255,7 @@ class TestConcurrency:
             update_count[0] += 1
         
         threads = [
-            threading.Thread(target=update_job, args=(JobStatus.PROCESSING,))
+            threading.Thread(target=update_job, args=(JobStatus.ANALYZING,))
             for _ in range(3)
         ]
         
@@ -277,33 +277,33 @@ class TestJobStatusTransitions:
         """Test a job through its complete lifecycle."""
         # Create
         job = job_manager.create_job("test_video.mp4")
-        assert job.status == JobStatus.PENDING
+        assert job.status == JobStatus.ANALYZING
         
-        # Start processing
-        job = job_manager.update_job_status(job.job_id, JobStatus.PROCESSING)
-        assert job.status == JobStatus.PROCESSING
+        # Start analyzing
+        job = job_manager.update_job_status(job.job_id, JobStatus.ANALYZING)
+        assert job.status == JobStatus.ANALYZING
         assert job.started_at is not None
         
         # Complete
         result = {"summary": "Analysis complete"}
         job = job_manager.update_job_status(
-            job.job_id, JobStatus.COMPLETED, result=result
+            job.job_id, JobStatus.ANALYZED, result=result
         )
-        assert job.status == JobStatus.COMPLETED
+        assert job.status == JobStatus.ANALYZED
         assert job.result == result
         assert job.completed_at is not None
 
     def test_failed_job_lifecycle(self, job_manager):
-        """Test a job that fails during processing."""
+        """Test a job that fails during analyzing."""
         # Create
         job = job_manager.create_job("test_video.mp4")
         
-        # Start processing
-        job = job_manager.update_job_status(job.job_id, JobStatus.PROCESSING)
+        # Start analyzing
+        job = job_manager.update_job_status(job.job_id, JobStatus.ANALYZING)
         assert job.started_at is not None
         
         # Fail
-        error = "Processing failed: Model error"
+        error = "Processing unanalyzed: Model error"
         job = job_manager.update_job_status(
             job.job_id, JobStatus.FAILED, error=error
         )
@@ -312,12 +312,12 @@ class TestJobStatusTransitions:
         assert job.completed_at is not None
 
     def test_cancelled_job_lifecycle(self, job_manager):
-        """Test a job that is cancelled."""
+        """Test a job that is analysis-cancelled."""
         # Create
         job = job_manager.create_job("test_video.mp4")
         
-        # Start processing
-        job = job_manager.update_job_status(job.job_id, JobStatus.PROCESSING)
+        # Start analyzing
+        job = job_manager.update_job_status(job.job_id, JobStatus.ANALYZING)
         
         # Cancel
         job = job_manager.update_job_status(job.job_id, JobStatus.CANCELLED)

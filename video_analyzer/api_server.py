@@ -7,7 +7,7 @@ import os
 import threading
 import time
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Dict, List, Optional, Union
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Query
@@ -113,6 +113,104 @@ class SubmitJobRequest(BaseModel):
     )
 
 
+class SummaryResultResponse(BaseModel):
+    """Summary section of analysis result."""
+
+    detailed: str
+    brief: str
+    timeline: Optional[str] = None
+    transcript: Optional[str] = None
+
+    class Config:
+        extra = "forbid"
+
+
+class FrameAnalysisResponse(BaseModel):
+    timestamp: float
+    description: str
+    scene_type: str
+    error: Optional[str] = None
+    quality_scores: Optional[str] = None
+    quality_analysis: Optional[str] = None
+
+    class Config:
+        extra = "forbid"
+
+
+class AudioSegmentResponse(BaseModel):
+    text: Optional[str]
+    start_time: float
+    end_time: float
+    confidence: float
+
+    class Config:
+        extra = "forbid"
+
+
+class ModelsUsedResponse(BaseModel):
+    frame_analysis: str
+    summary: str
+    audio: Optional[str] = None
+
+    class Config:
+        extra = "forbid"
+
+
+class ProcessingTimingsResponse(BaseModel):
+    frame_selection: float
+    audio_transcription: float
+    frame_analysis: float
+    summary_generation: float
+    total: float
+
+    class Config:
+        extra = "forbid"
+
+
+class VideoPropertiesResponse(BaseModel):
+    fps: Optional[float] = None
+    total_frames: Optional[int] = None
+    width: Optional[int] = None
+    height: Optional[int] = None
+    codec: Optional[str] = None
+    bitrate: Optional[int] = None
+    format: Optional[str] = None
+    duration: Optional[float] = None
+    data_rate: Optional[str] = None
+    audio_codec: Optional[str] = None
+    audio_sample_rate: Optional[int] = None
+    file_size: Optional[int] = None
+    file_modified_date: Optional[str] = None
+    file_created_date: Optional[str] = None
+
+    class Config:
+        extra = "forbid"
+
+
+class AnalysisMetadataResponse(BaseModel):
+    num_frames_analyzed: int
+    num_audio_segments: int
+    video_duration: float
+    scene_distribution: Dict[str, int]
+    models_used: ModelsUsedResponse
+    processing_timings: Optional[ProcessingTimingsResponse] = None
+    video_properties: Optional[VideoPropertiesResponse] = None
+
+    class Config:
+        extra = "forbid"
+
+
+class AnalysisResultResponse(BaseModel):
+    summary: SummaryResultResponse
+    frame_analyses: List[FrameAnalysisResponse]
+    audio_segments: List[AudioSegmentResponse]
+    metadata: AnalysisMetadataResponse
+    warnings: List[str] = []
+
+    class Config:
+        extra = "forbid"
+
+
 class JobResponse(BaseModel):
     """Response containing job information."""
 
@@ -130,8 +228,11 @@ class JobResultResponse(BaseModel):
 
     job_id: str
     status: str
-    result: Optional[dict] = None
+    result: Optional[AnalysisResultResponse] = None
     error: Optional[str] = None
+
+    class Config:
+        extra = "forbid"
 
 
 class HealthResponse(BaseModel):
@@ -176,6 +277,7 @@ def create_app() -> FastAPI:
     @app.get("/", tags=["Info"])
     async def root() -> dict[str, str]:
         """API root endpoint with documentation."""
+        logger.info("GET / called")
         return {
             "name": "VideoAnalyzer API",
             "description": "Video analysis service",
@@ -186,11 +288,14 @@ def create_app() -> FastAPI:
     @app.get("/health", response_model=HealthResponse, tags=["Health"])
     async def health() -> HealthResponse:
         """Check API health."""
-        return HealthResponse(
+        logger.info("GET /health called")
+        health_resp = HealthResponse(
             status="healthy",
             worker_running=worker_running,
             jobs_db_exists=job_manager.db_path.exists(),
         )
+        logger.debug("Health response: %s", health_resp.dict())
+        return health_resp
 
     @app.post("/analyze", response_model=JobResponse, tags=["Analysis"])
     async def submit_analysis(request: SubmitJobRequest) -> JobResponse:
@@ -199,15 +304,19 @@ def create_app() -> FastAPI:
         The API will process the video in the background. Use the returned job_id
         to check status and retrieve results.
         """
+        logger.info("POST /analyze called: video_path=%s params=%s", request.video_path, request.parameters)
+
         # Validate video path
         video_path = Path(request.video_path)
         if not video_path.exists():
+            logger.warning("Invalid video path: %s does not exist", request.video_path)
             raise HTTPException(
                 status_code=400,
                 detail=f"Video file not found: {request.video_path}",
             )
 
         if not video_path.is_file():
+            logger.warning("Invalid video path: %s is not a file", request.video_path)
             raise HTTPException(
                 status_code=400,
                 detail=f"Path is not a file: {request.video_path}",
@@ -216,27 +325,29 @@ def create_app() -> FastAPI:
         # Create job
         params = request.parameters.dict() if request.parameters else {}
         job = job_manager.create_job(str(video_path), params)
-
-        return JobResponse(
+        response = JobResponse(
             job_id=job.job_id,
             video_path=job.video_path,
             status=job.status.value,
             created_at=job.created_at.isoformat(),
         )
+        logger.info("Job created: %s", response.job_id)
+        return response
 
     @app.get("/jobs", response_model=list[JobResponse], tags=["Jobs"])
     async def list_jobs(
         status: Optional[str] = Query(
-            None, description="Filter by status (pending, processing, completed, failed)"
+            None, description="Filter by status (analyzing, analyzed, unanalyzed, analysis-cancelled)"
         ),
     ) -> list[JobResponse]:
         """List all jobs, optionally filtered by status."""
+        logger.info("GET /jobs called status=%s", status)
         all_jobs = job_manager.get_all_jobs()
 
         if status:
             all_jobs = [j for j in all_jobs if j.status.value == status]
 
-        return [
+        response = [
             JobResponse(
                 job_id=j.job_id,
                 video_path=j.video_path,
@@ -248,15 +359,19 @@ def create_app() -> FastAPI:
             )
             for j in all_jobs
         ]
+        logger.debug("/jobs response count=%d", len(response))
+        return response
 
     @app.get("/jobs/{job_id}", response_model=JobResponse, tags=["Jobs"])
     async def get_job(job_id: str) -> JobResponse:
         """Get job status by ID."""
+        logger.info("GET /jobs/%s called", job_id)
         job = job_manager.get_job(job_id)
         if not job:
+            logger.warning("Job not found: %s", job_id)
             raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
 
-        return JobResponse(
+        response = JobResponse(
             job_id=job.job_id,
             video_path=job.video_path,
             status=job.status.value,
@@ -265,60 +380,67 @@ def create_app() -> FastAPI:
             completed_at=job.completed_at.isoformat() if job.completed_at else None,
             error=job.error,
         )
+        logger.debug("/jobs/%s response: %s", job_id, response.dict())
+        return response
 
     @app.get("/jobs/{job_id}/result", response_model=JobResultResponse, tags=["Jobs"])
     async def get_job_result(job_id: str) -> JobResultResponse:
-        """Get analysis result for completed job."""
+        """Get analysis result for analyzed job."""
+        logger.info("GET /jobs/%s/result called", job_id)
         job = job_manager.get_job(job_id)
         if not job:
+            logger.warning("Job result not found: %s", job_id)
             raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
 
-        if job.status == JobStatus.PENDING:
+        if job.status == JobStatus.ANALYZING:
+            logger.debug("Job %s analyzing", job_id)
             raise HTTPException(
                 status_code=202,
-                detail="Job is still pending",
+                detail="Job is still analyzing",
             )
 
-        if job.status == JobStatus.PROCESSING:
-            raise HTTPException(
-                status_code=202,
-                detail="Job is still processing",
-            )
-
-        if job.status == JobStatus.FAILED:
+        if job.status == JobStatus.UNANALYZED:
+            logger.error("Job %s unanalyzed: %s", job_id, job.error)
             raise HTTPException(
                 status_code=500,
-                detail=f"Job failed: {job.error}",
+                detail=f"Job unanalyzed: {job.error}",
             )
 
         if job.status == JobStatus.CANCELLED:
+            logger.warning("Job %s analysis-cancelled", job_id)
             raise HTTPException(
                 status_code=400,
-                detail="Job was cancelled",
+                detail="Job was analysis-cancelled",
             )
 
-        return JobResultResponse(
+        response = JobResultResponse(
             job_id=job.job_id,
             status=job.status.value,
-            result=job.result,
+            result=AnalysisResultResponse.parse_obj(job.result) if job.result is not None else None,
             error=job.error,
         )
+        logger.debug("Job %s result returned", job_id)
+        return response
 
     @app.delete("/jobs/{job_id}", tags=["Jobs"])
     async def cancel_job(job_id: str) -> dict[str, str]:
         """Cancel or delete a job."""
+        logger.info("DELETE /jobs/%s called", job_id)
         job = job_manager.get_job(job_id)
         if not job:
+            logger.warning("Job not found for delete/cancel: %s", job_id)
             raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
 
-        if job.status in (JobStatus.COMPLETED, JobStatus.FAILED):
-            # Delete completed/failed jobs
+        if job.status in (JobStatus.ANALYZED, JobStatus.UNANALYZED):
+            # Delete analyzed/unanalyzed jobs
             job_manager.delete_job(job_id)
+            logger.info("Job %s deleted", job_id)
             return {"message": f"Job {job_id} deleted"}
 
-        # Cancel pending/processing jobs
+        # Cancel analyzing jobs
         job_manager.update_job_status(job_id, JobStatus.CANCELLED)
-        return {"message": f"Job {job_id} cancelled"}
+        logger.info("Job %s analysis-cancelled", job_id)
+        return {"message": f"Job {job_id} analysis-cancelled"}
 
     return app
 
@@ -329,24 +451,25 @@ def create_app() -> FastAPI:
 
 
 def process_jobs() -> None:
-    """Worker thread that processes pending jobs."""
+    """Worker thread that processes jobs in analyzing state."""
     logger.info("Job worker started")
 
     while worker_running:
+        job = None
         try:
-            # Get next pending job
+            # Get next job that is analyzing but not yet started
             all_jobs = job_manager.get_all_jobs()
-            pending_jobs = [j for j in all_jobs if j.status == JobStatus.PENDING]
+            analyzing_jobs = [j for j in all_jobs if j.status == JobStatus.ANALYZING and j.started_at is None]
 
-            if not pending_jobs:
+            if not analyzing_jobs:
                 time.sleep(1)
                 continue
 
-            job = pending_jobs[0]
+            job = analyzing_jobs[0]
             logger.info(f"Processing job {job.job_id}: {job.video_path}")
 
-            # Update status to processing
-            job_manager.update_job_status(job.job_id, JobStatus.PROCESSING)
+            # Mark started (still analyzing status)
+            job_manager.update_job_status(job.job_id, JobStatus.ANALYZING)
 
             # Build analyzer with job parameters
             params = job.parameters or {}
@@ -416,17 +539,23 @@ def process_jobs() -> None:
             result_obj = analyzer.analyze_video_structured(job.video_path)
             result_dict = result_obj.to_dict()
 
-            # Mark as completed
+            # Mark as analyzed
             job_manager.update_job_status(
-                job.job_id, JobStatus.COMPLETED, result=result_dict
+                job.job_id, JobStatus.ANALYZED, result=result_dict
             )
             logger.info(f"Completed job {job.job_id}")
 
         except Exception as e:
-            logger.error(f"Error processing job {job.job_id}: {str(e)}", exc_info=True)
-            if job:
+            job_id = job.job_id if job is not None else "<unknown>"
+            logger.error(
+                "Error analyzing job %s: %s",
+                job_id,
+                str(e),
+                exc_info=True,
+            )
+            if job is not None:
                 job_manager.update_job_status(
-                    job.job_id, JobStatus.FAILED, error=str(e)
+                    job.job_id, JobStatus.UNANALYZED, error=str(e)
                 )
             time.sleep(1)
 
@@ -472,7 +601,7 @@ def run() -> None:
         "--host", default="0.0.0.0", help="Server host (default: 0.0.0.0)"
     )
     parser.add_argument(
-        "--port", type=int, default=8000, help="Server port (default: 8000)"
+        "--port", type=int, default=3002, help="Server port (default: 3002)"
     )
     parser.add_argument(
         "--reload",

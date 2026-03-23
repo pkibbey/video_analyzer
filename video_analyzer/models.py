@@ -36,8 +36,8 @@ class AnalysisPrompts:
         "If context is provided, use it only for continuity without referencing it directly."
     )
 
-    detailed_summary: str = """You are an expert video and audio analyst and storyteller. Based on the following chronological descriptions 
-    of key moments from a {duration:.1f}-second video, along with its audio transcript, create a comprehensive narrative.
+    detailed_summary: str = """You are an expert video and audio analyst. Based on the following chronological descriptions 
+    of key moments from a {duration:.1f}-second video, along with its audio transcript, provide a factual, explicit summary.
 
     Video Timeline:
     {timeline}
@@ -46,14 +46,13 @@ class AnalysisPrompts:
     {transcript}
 
     Please provide a detailed summary that:
-    1. Tells a cohesive story integrating both visual and audio elements
-    2. Captures the progression and flow of events
-    3. Highlights significant moments, changes, and patterns
-    4. Notes any important dialogue or audio cues
-    5. Identifies relationships between what is seen and heard
-    6. Maintains a natural, engaging narrative style
+    1. Uses only information present in the timeline and transcript (no invention)
+    2. Emphasizes concrete events, speakers, timing, and actions
+    3. Avoids creative storytelling, metaphors, or speculation
+    4. Notes key changes, repeated themes, and important audio cues
+    5. Keeps sentences direct and to the point
 
-    Focus on creating a flowing narrative that combines visual and audio elements."""
+    Focus on factual accuracy and clear structure."""
 
     brief_summary: str = """You are an expert video and audio analyst. Based on the following information from a {duration:.1f}-second video:
 
@@ -63,7 +62,11 @@ class AnalysisPrompts:
     Audio Transcript:
     {transcript}
 
-    Provide a concise 2-3 line summary that captures the essence of both the visual and audio content."""
+    Provide a concise 2-3 line summary with:
+    - only factual observable points
+    - no inventing details or presuming motives
+    - no narrative embellishment
+    - a clear statement of what happened and what was heard."""
     
     quality_analysis: str = "Analyze this frame from a video editing perspective. Provide quality scores (1-10) for each metric and note any issues."
     quality_analysis_system: str = "You are a professional video editor evaluating footage for usability. Provide objective quality assessments based on technical criteria."
@@ -75,14 +78,16 @@ class FrameAnalysis:
     description: str
     scene_type: str
     error: Optional[str] = None
-    quality_scores: Optional[Dict[str, Any]] = None
-    quality_analysis: Optional[Union[str, Dict[str, Any]]] = None
+    quality_scores: Optional[str] = None
+    quality_analysis: Optional[str] = None
 
 
 @dataclass
 class SummaryResult:
     detailed: str
     brief: str
+    timeline: Optional[str] = None
+    transcript: Optional[str] = None
 
 
 @dataclass
@@ -116,6 +121,7 @@ class VideoProperties:
     data_rate: Optional[str] = None  # Human-readable bitrate (e.g., "1.5 Mbps")
     audio_codec: Optional[str] = None  # Audio codec (e.g., aac, mp3)
     audio_sample_rate: Optional[int] = None  # Audio sample rate in Hz (e.g., 48000)
+    file_size: Optional[int] = None  # File size in bytes
     file_modified_date: Optional[str] = None  # File modification date (ISO format)
     file_created_date: Optional[str] = None  # File creation date (ISO format)
 
@@ -188,8 +194,10 @@ ANALYSIS_RESULT_SCHEMA: Dict[str, Any] = {
             "additionalProperties": False,
             "required": ["detailed", "brief"],
             "properties": {
-                "detailed": {"type": "string"},
+                "detailed": {"type": ["string", "object"]},
                 "brief": {"type": "string"},
+                "timeline": {"type": ["string", "null"]},
+                "transcript": {"type": ["string", "null"]},
             },
         },
         "frame_analyses": {
@@ -203,14 +211,8 @@ ANALYSIS_RESULT_SCHEMA: Dict[str, Any] = {
                     "description": {"type": "string"},
                     "scene_type": {"type": "string"},
                     "error": {"type": ["string", "null"]},
-                    "quality_scores": {
-                        "type": ["object", "null"],
-                        "additionalProperties": True
-                    },
-                    "quality_analysis": {
-                        "type": ["object", "string", "null"],
-                        "additionalProperties": True
-                    },
+                    "quality_scores": {"type": ["string", "null"]},
+                    "quality_analysis": {"type": ["string", "null"]},
                 },
             },
         },
@@ -279,6 +281,13 @@ ANALYSIS_RESULT_SCHEMA: Dict[str, Any] = {
                         "codec": {"type": ["string", "null"]},
                         "bitrate": {"type": ["integer", "null"]},
                         "format": {"type": ["string", "null"]},
+                        "duration": {"type": ["number", "null"]},
+                        "data_rate": {"type": ["string", "null"]},
+                        "audio_codec": {"type": ["string", "null"]},
+                        "audio_sample_rate": {"type": ["integer", "null"]},
+                        "file_size": {"type": ["integer", "null"]},
+                        "file_modified_date": {"type": ["string", "null"]},
+                        "file_created_date": {"type": ["string", "null"]},
                     },
                 },
             },

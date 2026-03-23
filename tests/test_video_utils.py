@@ -62,3 +62,22 @@ def test_get_video_duration_uses_fallback_when_unavailable(monkeypatch):
     monkeypatch.setattr(video_utils.cv2, "VideoCapture", lambda _path: ClosedCap())
 
     assert video_utils.get_video_duration("dummy", fallback_duration=5.5) == 5.5
+
+
+def test_get_video_properties_reports_file_size(tmp_path, monkeypatch):
+    video_path = tmp_path / "test_video.mp4"
+    video_path.write_bytes(b"1234567890")
+
+    monkeypatch.setattr(video_utils.ffmpeg, "probe", lambda _path: {"format": {}})
+    class ClosedCap:
+        def isOpened(self):
+            return False
+
+        def release(self):
+            return None
+
+    monkeypatch.setattr(video_utils.cv2, "VideoCapture", lambda _path: ClosedCap())
+
+    props = video_utils.get_video_properties(str(video_path))
+    assert props["file_size"] == 10
+

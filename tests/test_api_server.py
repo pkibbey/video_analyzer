@@ -7,6 +7,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
+from pydantic import ValidationError
 
 from video_analyzer.api_server import (
     AnalysisParameters,
@@ -144,7 +145,7 @@ class TestSubmitJobEndpoint:
         data = response.json()
         assert "job_id" in data
         assert data["video_path"] == temp_video_file
-        assert data["status"] == "pending"
+        assert data["status"] == "analyzing"
 
     def test_submit_job_missing_video(self, client):
         """Test submitting job with nonexistent video."""
@@ -187,7 +188,7 @@ class TestSubmitJobEndpoint:
 
         assert response.status_code == 200
         job_response = JobResponse(**response.json())
-        assert job_response.status == "pending"
+        assert job_response.status == "analyzing"
 
     def test_submit_job_response_structure(self, client, temp_video_file):
         """Test submit job response has required fields."""
@@ -200,7 +201,7 @@ class TestSubmitJobEndpoint:
         job = JobResponse(**data)
         assert job.job_id is not None
         assert job.video_path == temp_video_file
-        assert job.status == "pending"
+        assert job.status == "analyzing"
         assert job.created_at is not None
         assert job.started_at is None
 
@@ -225,12 +226,12 @@ class TestListJobsEndpoint:
         )
         assert submit_response.status_code == 200
 
-        # List jobs with pending status
-        response = client.get("/jobs?status=pending")
+        # List jobs with analyzing status
+        response = client.get("/jobs?status=analyzing")
 
         assert response.status_code == 200
         jobs = response.json()
-        assert all(j["status"] == "pending" for j in jobs)
+        assert all(j["status"] == "analyzing" for j in jobs)
 
     def test_list_jobs_invalid_status(self, client):
         """Test list jobs with invalid status filter."""
@@ -258,7 +259,7 @@ class TestGetJobEndpoint:
         assert response.status_code == 200
         data = response.json()
         assert data["job_id"] == job_id
-        assert data["status"] == "pending"
+        assert data["status"] == "analyzing"
 
     def test_get_job_not_found(self, client):
         """Test getting nonexistent job."""
@@ -280,12 +281,12 @@ class TestGetJobEndpoint:
         data = response.json()
         job = JobResponse(**data)
         assert job.job_id == job_id
-        assert job.status in ["pending", "processing", "completed", "failed", "cancelled"]
+        assert job.status in ["analyzing", "analyzing", "analyzed", "unanalyzed", "analysis-cancelled"]
 
 
 class TestGetJobResultEndpoint:
-    def test_get_job_result_pending(self, client, temp_video_file):
-        """Test getting result of pending job returns 202."""
+    def test_get_job_result_analyzing(self, client, temp_video_file):
+        """Test getting result of analyzing job returns 202."""
         submit_response = client.post(
             "/analyze",
             json={"video_path": temp_video_file}
@@ -295,7 +296,7 @@ class TestGetJobResultEndpoint:
         response = client.get(f"/jobs/{job_id}/result")
 
         assert response.status_code == 202
-        assert "pending" in response.json()["detail"].lower()
+        assert "analyzing" in response.json()["detail"].lower()
 
     def test_get_job_result_not_found(self, client):
         """Test getting result for nonexistent job."""
@@ -304,7 +305,7 @@ class TestGetJobResultEndpoint:
         assert response.status_code == 404
 
     def test_get_job_result_cancelled(self, client, temp_video_file):
-        """Test getting result of cancelled job returns 400."""
+        """Test getting result of analysis-cancelled job returns 400."""
         # Submit a job  
         submit_response = client.post(
             "/analyze",
@@ -320,12 +321,12 @@ class TestGetJobResultEndpoint:
         response = client.get(f"/jobs/{job_id}/result")
 
         assert response.status_code == 400
-        assert "cancelled" in response.json()["detail"].lower()
+        assert "analysis-cancelled" in response.json()["detail"].lower()
 
 
 class TestCancelJobEndpoint:
-    def test_cancel_pending_job(self, client, temp_video_file):
-        """Test cancelling a pending job."""
+    def test_cancel_analyzing_job(self, client, temp_video_file):
+        """Test cancelling a analyzing job."""
         submit_response = client.post(
             "/analyze",
             json={"video_path": temp_video_file}
@@ -335,11 +336,11 @@ class TestCancelJobEndpoint:
         response = client.delete(f"/jobs/{job_id}")
 
         assert response.status_code == 200
-        assert "cancelled" in response.json()["message"].lower()
+        assert "analysis-cancelled" in response.json()["message"].lower()
 
-        # Verify job status is cancelled
+        # Verify job status is analysis-cancelled
         get_response = client.get(f"/jobs/{job_id}")
-        assert get_response.json()["status"] == "cancelled"
+        assert get_response.json()["status"] == "analysis-cancelled"
 
     def test_cancel_nonexistent_job(self, client):
         """Test cancelling nonexistent job returns 404."""
@@ -389,26 +390,62 @@ class TestResponseModels:
         job_response = JobResponse(
             job_id="test_id",
             video_path="/path/to/video.mp4",
-            status="pending",
+            status="analyzing",
             created_at="2024-01-01T00:00:00",
         )
 
         assert job_response.job_id == "test_id"
-        assert job_response.status == "pending"
+        assert job_response.status == "analyzing"
         assert job_response.started_at is None
 
     def test_job_result_response_model(self):
-        """Test JobResultResponse model."""
-        result = {"summary": "Test summary"}
+        """Test JobResultResponse model with strict analysis schema."""
+        result = {
+            "summary": {"detailed": "Detailed summary", "brief": "Brief summary"},
+            "frame_analyses": [],
+            "audio_segments": [],
+            "metadata": {
+                "num_frames_analyzed": 0,
+                "num_audio_segments": 0,
+                "video_duration": 0.0,
+                "scene_distribution": {},
+                "models_used": {
+                    "frame_analysis": "ministral-3:3b-cloud",
+                    "summary": "ministral-3:14b-cloud",
+                    "audio": None,
+                },
+                "processing_timings": {
+                    "frame_selection": 0.0,
+                    "audio_transcription": 0.0,
+                    "frame_analysis": 0.0,
+                    "summary_generation": 0.0,
+                    "total": 0.0,
+                },
+                "video_properties": None,
+            },
+            "warnings": [],
+        }
+
         response = JobResultResponse(
             job_id="test_id",
-            status="completed",
+            status="analyzed",
             result=result,
         )
 
         assert response.job_id == "test_id"
-        assert response.status == "completed"
-        assert response.result == result
+        assert response.status == "analyzed"
+        assert response.result is not None
+        assert response.result.summary.detailed == "Detailed summary"
+        assert response.result.summary.brief == "Brief summary"
+
+    def test_job_result_response_model_rejects_invalid_result(self):
+        """Ensure JobResultResponse enforces AnalysisResultResponse typing."""
+        with pytest.raises(ValidationError):
+            JobResultResponse(
+                job_id="test_id",
+                status="analyzed",
+                result={"this_is_not":"valid"},
+            )
 
     def test_health_response_model_validation(self):
         """Test HealthResponse model validation."""
@@ -443,9 +480,9 @@ class TestAPIIntegration:
         get_response = client.get(f"/jobs/{job_id}")
         assert get_response.status_code == 200
         job_data = get_response.json()
-        assert job_data["status"] == "pending"
+        assert job_data["status"] == "analyzing"
 
-        # 4. Get result of pending job returns 202
+        # 4. Get result of analyzing job returns 202
         result_response = client.get(f"/jobs/{job_id}/result")
         assert result_response.status_code == 202
 
@@ -453,9 +490,9 @@ class TestAPIIntegration:
         cancel_response = client.delete(f"/jobs/{job_id}")
         assert cancel_response.status_code == 200
 
-        # 6. Verify job is cancelled
+        # 6. Verify job is analysis-cancelled
         get_response = client.get(f"/jobs/{job_id}")
-        assert get_response.json()["status"] == "cancelled"
+        assert get_response.json()["status"] == "analysis-cancelled"
 
     def test_multiple_jobs_independent(self, client, temp_video_file):
         """Test that multiple jobs are independent."""
@@ -478,7 +515,7 @@ class TestAPIIntegration:
         # Cancel one doesn't affect the other
         client.delete(f"/jobs/{job1_id}")
 
-        # Job 2 should still exist and be pending
+        # Job 2 should still exist and be analyzing
         job2_response = client.get(f"/jobs/{job2_id}")
         assert job2_response.status_code == 200
-        assert job2_response.json()["status"] == "pending"
+        assert job2_response.json()["status"] == "analyzing"

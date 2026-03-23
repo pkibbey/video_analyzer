@@ -76,7 +76,7 @@ python api_client.py status <job_id>
 python api_client.py result <job_id>
 
 # List jobs
-python api_client.py list --status completed
+python api_client.py list --status analyzed
 
 # Cancel job
 python api_client.py cancel <job_id>
@@ -99,8 +99,8 @@ curl http://localhost:8000/jobs/<job_id>/result
 # List all jobs
 curl http://localhost:8000/jobs
 
-# List completed jobs
-curl "http://localhost:8000/jobs?status=completed"
+# List analyzed jobs
+curl "http://localhost:8000/jobs?status=analyzed"
 
 # Cancel job
 curl -X DELETE http://localhost:8000/jobs/<job_id>
@@ -108,11 +108,11 @@ curl -X DELETE http://localhost:8000/jobs/<job_id>
 
 ## Job Status Values
 
-- `pending` - Job submitted, waiting to be processed
-- `processing` - Job is currently being analyzed
-- `completed` - Analysis finished successfully
-- `failed` - Analysis encountered an error
-- `cancelled` - Job was cancelled by user
+- `analysis-pending` - Job submitted, waiting to be processed
+- `analyzing` - Job is currently being analyzed
+- `analyzed` - Analysis finished successfully
+- `unanalyzed` - Analysis encountered an error
+- `analysis-cancelled` - Job was analysis-cancelled by user
 
 ## Architecture
 
@@ -125,7 +125,7 @@ The API uses:
 
 Key features:
 - Async/non-blocking job submission
-- Background processing thread
+- Background analyzing thread
 - Persistent job storage
 - Automatic worker lifecycle management
 - Interactive Swagger documentation at `/docs`
@@ -173,10 +173,10 @@ while true; do
   STATUS=$(curl -s http://localhost:8000/jobs/$JOB_ID | jq -r '.status')
   echo "Status: $STATUS"
   
-  if [ "$STATUS" = "completed" ]; then
+  if [ "$STATUS" = "analyzed" ]; then
     break
-  elif [ "$STATUS" = "failed" ]; then
-    echo "Job failed!"
+  elif [ "$STATUS" = "unanalyzed" ]; then
+    echo "Job unanalyzed!"
     exit 1
   fi
   
@@ -201,7 +201,7 @@ curl http://localhost:8000/jobs/$JOB_ID/result | jq .
 - Ensure dependencies installed: `pip install -e .`
 - Verify Ollama running: `curl http://localhost:11434/api/tags`
 
-**Jobs stuck processing**
+**Jobs stuck analyzing**
 - Check worker running: `curl http://localhost:8000/health`
 - Review API server logs
 - Verify video file is readable

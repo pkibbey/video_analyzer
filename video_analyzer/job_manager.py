@@ -19,11 +19,10 @@ logger = logging.getLogger(__name__)
 class JobStatus(str, Enum):
     """Status of an analysis job."""
 
-    PENDING = "pending"
-    PROCESSING = "processing"
-    COMPLETED = "completed"
-    FAILED = "failed"
-    CANCELLED = "cancelled"
+    ANALYZING = "analyzing"
+    ANALYZED = "analyzed"
+    UNANALYZED = "unanalyzed"
+    CANCELLED = "analysis-cancelled"
 
 
 @dataclass
@@ -32,7 +31,7 @@ class AnalysisJob:
 
     job_id: str
     video_path: str
-    status: JobStatus = JobStatus.PENDING
+    status: JobStatus = JobStatus.ANALYZING
     created_at: datetime = field(default_factory=datetime.utcnow)
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
@@ -167,8 +166,8 @@ class JobManager:
         Args:
             job_id: Job ID to update
             status: New job status
-            result: Optional result data (for completed jobs)
-            error: Optional error message (for failed jobs)
+            result: Optional result data (for analyzed jobs)
+            error: Optional error message (for unanalyzed jobs)
             
         Returns:
             Updated AnalysisJob or None if not found
@@ -178,9 +177,9 @@ class JobManager:
             return None
 
         now = datetime.utcnow()
-        if status == JobStatus.PROCESSING and not job.started_at:
+        if status == JobStatus.ANALYZING and not job.started_at:
             job.started_at = now
-        elif status in (JobStatus.COMPLETED, JobStatus.FAILED, JobStatus.CANCELLED):
+        elif status in (JobStatus.ANALYZED, JobStatus.UNANALYZED, JobStatus.CANCELLED):
             job.completed_at = now
 
         job.status = status
@@ -241,10 +240,22 @@ class JobManager:
             parameters,
         ) = row
 
+        normalized_status = status
+        if status == "pending":
+            normalized_status = JobStatus.ANALYZING.value
+        elif status == "processing":
+            normalized_status = JobStatus.ANALYZING.value
+        elif status == "completed":
+            normalized_status = JobStatus.ANALYZED.value
+        elif status == "failed":
+            normalized_status = JobStatus.UNANALYZED.value
+        elif status == "cancelled":
+            normalized_status = JobStatus.CANCELLED.value
+
         return AnalysisJob(
             job_id=job_id,
             video_path=video_path,
-            status=JobStatus(status),
+            status=JobStatus(normalized_status),
             created_at=datetime.fromisoformat(created_at),
             started_at=datetime.fromisoformat(started_at) if started_at else None,
             completed_at=datetime.fromisoformat(completed_at)

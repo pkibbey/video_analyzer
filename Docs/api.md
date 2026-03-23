@@ -115,7 +115,7 @@ Submit a video for analysis.
 {
   "job_id": "550e8400-e29b-41d4-a716-446655440000",
   "video_path": "/path/to/video.mp4",
-  "status": "pending",
+  "status": "analysis-pending",
   "created_at": "2024-03-21T10:30:00"
 }
 ```
@@ -131,7 +131,7 @@ Get the current status of a job.
 {
   "job_id": "550e8400-e29b-41d4-a716-446655440000",
   "video_path": "/path/to/video.mp4",
-  "status": "processing",
+  "status": "analyzing",
   "created_at": "2024-03-21T10:30:00",
   "started_at": "2024-03-21T10:31:00"
 }
@@ -141,13 +141,13 @@ Get the current status of a job.
 
 **GET /jobs/{job_id}/result**
 
-Get analysis results for a completed job.
+Get analysis results for a analyzed job.
 
-**Response (200 OK if completed):**
+**Response (200 OK if analyzed):**
 ```json
 {
   "job_id": "550e8400-e29b-41d4-a716-446655440000",
-  "status": "completed",
+  "status": "analyzed",
   "result": {
     "summary": {
       "brief": "A person walking in the park",
@@ -163,21 +163,21 @@ Get analysis results for a completed job.
 }
 ```
 
-**Response (202 if still processing):**
+**Response (202 if still analyzing):**
 ```json
 {
-  "detail": "Job is still processing"
+  "detail": "Job is still analyzing"
 }
 ```
 
 ### List Jobs
 
-**GET /jobs?status=pending**
+**GET /jobs?status=analysis-pending**
 
 List all jobs, optionally filtered by status.
 
 **Query Parameters:**
-- `status` (optional): Filter by status - `pending`, `processing`, `completed`, or `failed`
+- `status` (optional): Filter by status - `analysis-pending`, `analyzing`, `analyzed`, or `unanalyzed`
 
 **Response:**
 ```json
@@ -185,7 +185,7 @@ List all jobs, optionally filtered by status.
   {
     "job_id": "550e8400-e29b-41d4-a716-446655440000",
     "video_path": "/path/to/video.mp4",
-    "status": "completed",
+    "status": "analyzed",
     "created_at": "2024-03-21T10:30:00"
   }
 ]
@@ -195,12 +195,12 @@ List all jobs, optionally filtered by status.
 
 **DELETE /jobs/{job_id}**
 
-Cancel a pending/processing job or delete a completed/failed job.
+Cancel a analysis-pending/analyzing job or delete a analyzed/unanalyzed job.
 
 **Response:**
 ```json
 {
-  "message": "Job 550e8400-e29b-41d4-a716-446655440000 cancelled"
+  "message": "Job 550e8400-e29b-41d4-a716-446655440000 analysis-cancelled"
 }
 ```
 
@@ -225,7 +225,7 @@ Response:
 ```json
 {
   "job_id": "550e8400-e29b-41d4-a716-446655440000",
-  "status": "pending",
+  "status": "analysis-pending",
   "created_at": "2024-03-21T10:30:00"
 }
 ```
@@ -282,7 +282,7 @@ python api_client.py status <job_id>
 python api_client.py result <job_id>
 
 # List jobs
-python api_client.py list --status completed
+python api_client.py list --status analyzed
 
 # Cancel job
 python api_client.py cancel <job_id>
@@ -326,9 +326,9 @@ curl http://localhost:8000/jobs/<job_id>/result
 curl http://localhost:8000/jobs
 ```
 
-### List completed jobs
+### List analyzed jobs
 ```bash
-curl "http://localhost:8000/jobs?status=completed"
+curl "http://localhost:8000/jobs?status=analyzed"
 ```
 
 ### Cancel job
@@ -341,10 +341,10 @@ curl -X DELETE http://localhost:8000/jobs/<job_id>
 ### Status Codes
 
 - **200 OK**: Request successful
-- **202 Accepted**: Job submitted or still processing
+- **202 Accepted**: Job submitted or still analyzing
 - **400 Bad Request**: Invalid request (e.g., video file not found)
 - **404 Not Found**: Job or resource not found
-- **500 Internal Server Error**: Job failed or server error
+- **500 Internal Server Error**: Job unanalyzed or server error
 
 ### Error Responses
 
@@ -362,17 +362,17 @@ curl -X DELETE http://localhost:8000/jobs/<job_id>
 }
 ```
 
-**Job still processing:**
+**Job still analyzing:**
 ```json
 {
-  "detail": "Job is still processing"
+  "detail": "Job is still analyzing"
 }
 ```
 
-**Job failed:**
+**Job unanalyzed:**
 ```json
 {
-  "detail": "Job failed: Connection refused to Ollama server"
+  "detail": "Job unanalyzed: Connection refused to Ollama server"
 }
 ```
 
@@ -407,7 +407,7 @@ Client
   ↓
 POST /analyze (submit job)
   ↓
-SQLite DB (job stored as PENDING)
+SQLite DB (job stored as analysis-pending)
   ↓
 Worker Thread (polls DB)
   ↓
@@ -422,7 +422,7 @@ Returns analysis result
 
 ## Scaling Considerations
 
-- **Single Worker**: Default configuration with one worker thread processing jobs sequentially
+- **Single Worker**: Default configuration with one worker thread analyzing jobs sequentially
 - **Multiple Processes**: Use `--workers N` to run multiple API server processes
 - **Database**: SQLite is suitable for development; consider PostgreSQL for production
 - **Storage**: Job results are stored in the database; consider implementing result cleanup for long-running servers
@@ -442,7 +442,7 @@ for i in range(600):  # 10 minutes
         print("Analysis complete!")
         break
     except Exception as e:
-        if "still processing" in str(e):
+        if "still analyzing" in str(e):
             time.sleep(1)
         else:
             raise
@@ -479,7 +479,7 @@ for job in jobs:
 - Check that dependencies are installed: `pip install -e .`
 - Verify Ollama server is running at the configured host
 
-### Jobs stuck in processing
+### Jobs stuck in analyzing
 - Check worker thread is running: `GET /health`
 - Review logs for errors
 - Verify video files are accessible to the worker process

@@ -120,7 +120,7 @@ def _print_summary(data: Dict[str, Any], structured_output: bool) -> None:
     if models_used.get("audio"):
         print(f"  Audio Transcription: {models_used.get('audio', 'N/A')}")
     
-    # Print processing timings
+    # Print analyzing timings
     timings = metadata.get("processing_timings")
     if timings:
         print(f"\nProcessing Times:")
@@ -181,7 +181,7 @@ def main() -> int:
         description="Playground demo for experimenting with VideoAnalyzer.",
     )
     parser.add_argument("video_path", help="Path to the video file")
-    parser.add_argument("--frame-model", default="ministral-3:3b-cloud")
+    parser.add_argument("--frame-model", default="ministral-3:8b-cloud")
     parser.add_argument("--summary-model", default="ministral-3:14b-cloud")
     parser.add_argument("--whisper-model", default="openai/whisper-small")
     parser.add_argument("--host", default="http://localhost:11434")

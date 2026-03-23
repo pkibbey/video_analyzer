@@ -186,7 +186,7 @@ class TestFrameAnalysis:
 
     def test_frame_analysis_with_optional_fields(self):
         """Test FrameAnalysis with all optional fields."""
-        quality_scores = {"brightness": 8, "focus": 9, "composition": 7}
+        quality_scores = "Focus:8, Exposure:7, Composition:9"
         quality_text = "Frame is well-lit and composed"
 
         analysis = FrameAnalysis(
@@ -201,24 +201,19 @@ class TestFrameAnalysis:
         assert analysis.quality_scores == quality_scores
         assert analysis.quality_analysis == quality_text
 
-    def test_frame_analysis_with_dict_quality_analysis(self):
-        """Test FrameAnalysis quality_analysis can be a dict."""
-        quality_dict = {
-            "brightness": 8,
-            "focus": 9,
-            "composition": 7,
-            "assessment": "Good"
-        }
+    def test_frame_analysis_quality_analysis_string_only(self):
+        """Ensure quality_analysis only accepts string-like output for strict typing."""
+        quality_text = "Overall quality is 7.5/10"
 
         analysis = FrameAnalysis(
             timestamp=5.0,
             description="Test",
             scene_type="action",
-            quality_analysis=quality_dict,
+            quality_analysis=quality_text,
         )
 
-        assert isinstance(analysis.quality_analysis, dict)
-        assert analysis.quality_analysis == quality_dict
+        assert isinstance(analysis.quality_analysis, str)
+        assert analysis.quality_analysis == quality_text
 
 
 class TestSummaryResult:

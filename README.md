@@ -23,8 +23,8 @@
 
 VideoAnalyzer brings the power of video analysis to your local machine. By using Ollama's models, you can:
 
-- Run everything locally without depending on external APIs
-- Maintain data privacy by processing videos on your own hardware
+- Run everything locally without deanalysis-pending on external APIs
+- Maintain data privacy by analyzing videos on your own hardware
 - Avoid usage costs associated with cloud-based solutions
 - Customize and fine-tune models for your specific needs
 - Process videos without internet connectivity
@@ -177,13 +177,13 @@ The `OllamaVideoAnalyzer` class offers extensive configuration options to custom
 
 - **max_frames** (int, default=64)
   - Maximum number of frames to analyze
-  - Higher values provide more detailed analysis but increase processing time
+  - Higher values provide more detailed analysis but increase analyzing time
   - Consider your hardware capabilities when adjusting this
 
 - **frames_per_minute** (float, default=4.0)
   - Target rate of frame extraction
   - Higher values capture more temporal detail
-  - Balance between detail and processing time
+  - Balance between detail and analyzing time
   - Recommended ranges:
     - 2-4 fps: Simple videos with minimal action
     - 4-8 fps: Standard content
@@ -201,7 +201,7 @@ The `OllamaVideoAnalyzer` class offers extensive configuration options to custom
 
 - **audio_transcriber** (Optional[AudioTranscriber], default=None)
   - Component for handling audio transcription
-  - Defaults to no audio processing if None
+  - Defaults to no audio analyzing if None
   - Common options:
     ```python
     WhisperTranscriber(
@@ -218,7 +218,7 @@ The `OllamaVideoAnalyzer` class offers extensive configuration options to custom
 ### Advanced Options
 
 - **custom_frame_processor** (Optional[Callable[[Frame], Dict]], default=None)
-  - Custom function for processing individual frames
+  - Custom function for analyzing individual frames
   - Allows integration of additional analysis tools
   - Must accept a Frame object and return a dictionary
   - Example:

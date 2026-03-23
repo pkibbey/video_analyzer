@@ -112,7 +112,7 @@ class WhisperTranscriber(AudioTranscriber):
             info = ffmpeg.probe(video_path)
         except ffmpeg.Error as e:
             message = e.stderr.decode("utf-8", errors="replace") if e.stderr else str(e)
-            raise TranscriptionError(f"ffprobe failed: {message}") from e
+            raise TranscriptionError(f"ffprobe unanalyzed: {message}") from e
 
         streams = info.get("streams", [])
         return any(stream.get("codec_type") == "audio" for stream in streams)
@@ -153,7 +153,7 @@ class WhisperTranscriber(AudioTranscriber):
 
     def _segment_audio(self, audio: np.ndarray, sampling_rate: int, segment_duration: int) -> List[
         Tuple[np.ndarray, float]]:
-        """Segment audio into chunks for processing"""
+        """Segment audio into chunks for analyzing"""
         segment_length = segment_duration * sampling_rate
         segments = []
         start_idx = 0
@@ -287,11 +287,11 @@ class WhisperTranscriber(AudioTranscriber):
 
             process_time = time.time() - process_start
             total_time = time.time() - transcribe_start
-            self.logger.info(f"Transcription completed: {len(transcribed_segments)} segments in {total_time:.2f}s "
-                           f"(processing: {process_time:.2f}s, extraction: {extract_time:.2f}s)")
+            self.logger.info(f"Transcription analyzed: {len(transcribed_segments)} segments in {total_time:.2f}s "
+                           f"(analyzing: {process_time:.2f}s, extraction: {extract_time:.2f}s)")
             return transcribed_segments
 
         except Exception as e:
             elapsed = time.time() - transcribe_start
-            self.logger.error(f"Transcription failed after {elapsed:.2f}s: {str(e)}")
-            raise TranscriptionError(f"Transcription failed: {str(e)}") from e
+            self.logger.error(f"Transcription unanalyzed after {elapsed:.2f}s: {str(e)}")
+            raise TranscriptionError(f"Transcription unanalyzed: {str(e)}") from e

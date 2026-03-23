@@ -64,7 +64,7 @@ class APIClient:
         return response.json()
 
     def get_job_result(self, job_id: str) -> dict[str, Any]:
-        """Get analysis result for completed job.
+        """Get analysis result for analyzed job.
         
         Args:
             job_id: Job ID
@@ -73,7 +73,7 @@ class APIClient:
             Analysis result dict
             
         Raises:
-            requests.HTTPError: If job not completed
+            requests.HTTPError: If job not analyzed
         """
         response = requests.get(
             f"{self.base_url}/jobs/{job_id}/result",
@@ -86,7 +86,7 @@ class APIClient:
         """List all jobs, optionally filtered by status.
         
         Args:
-            status: Filter by status (pending, processing, completed, failed)
+            status: Filter by status (analyzing, analyzing, analyzed, unanalyzed)
             
         Returns:
             List of job dicts
@@ -157,14 +157,14 @@ class APIClient:
             job = self.get_job_status(job_id)
             status = job["status"]
 
-            if status == "completed":
+            if status == "analyzed":
                 return self.get_job_result(job_id)
 
-            if status == "failed":
-                raise RuntimeError(f"Job failed: {job.get('error', 'Unknown error')}")
+            if status == "unanalyzed":
+                raise RuntimeError(f"Job unanalyzed: {job.get('error', 'Unknown error')}")
 
-            if status == "cancelled":
-                raise RuntimeError("Job was cancelled")
+            if status == "analysis-cancelled":
+                raise RuntimeError("Job was analysis-cancelled")
 
             print(f"Job {job_id} status: {status}... (elapsed: {time.time() - start_time:.0f}s)")
             time.sleep(poll_interval)
@@ -203,7 +203,7 @@ def main() -> None:
     list_parser = subparsers.add_parser("list", help="List jobs")
     list_parser.add_argument(
         "--status", 
-        choices=["pending", "processing", "completed", "failed"],
+        choices=["analyzing", "analyzed", "unanalyzed", "analysis-cancelled"],
         help="Filter by status"
     )
     

@@ -55,7 +55,7 @@ class TestTranscriptionError:
 
     def test_transcription_error_message(self):
         """Test TranscriptionError with descriptive message."""
-        error_msg = "Whisper failed: CUDA out of memory"
+        error_msg = "Whisper unanalyzed: CUDA out of memory"
         with pytest.raises(TranscriptionError) as exc_info:
             raise TranscriptionError(error_msg)
 
@@ -64,7 +64,7 @@ class TestTranscriptionError:
     def test_transcription_error_caught_as_parent(self):
         """Test TranscriptionError can be caught as VideoAnalysisError."""
         with pytest.raises(VideoAnalysisError):
-            raise TranscriptionError("Audio transcription failed")
+            raise TranscriptionError("Audio transcription unanalyzed")
 
 
 class TestFrameExtractionError:
@@ -75,14 +75,14 @@ class TestFrameExtractionError:
     def test_frame_extraction_error_message(self):
         """Test FrameExtractionError with message."""
         with pytest.raises(FrameExtractionError) as exc_info:
-            raise FrameExtractionError("OpenCV failed to extract frame at timestamp 5.0")
+            raise FrameExtractionError("OpenCV unanalyzed to extract frame at timestamp 5.0")
 
         assert "timestamp" in str(exc_info.value)
 
     def test_frame_extraction_error_caught_as_parent(self):
         """Test FrameExtractionError can be caught as VideoAnalysisError."""
         with pytest.raises(VideoAnalysisError):
-            raise FrameExtractionError("Frame extraction failed")
+            raise FrameExtractionError("Frame extraction unanalyzed")
 
 
 class TestModelInferenceError:
@@ -101,7 +101,7 @@ class TestModelInferenceError:
     def test_model_inference_error_caught_as_parent(self):
         """Test ModelInferenceError can be caught as VideoAnalysisError."""
         with pytest.raises(VideoAnalysisError):
-            raise ModelInferenceError("Model inference failed")
+            raise ModelInferenceError("Model inference unanalyzed")
 
 
 class TestAPIError:
@@ -119,7 +119,7 @@ class TestAPIError:
     def test_api_error_caught_as_parent(self):
         """Test APIError can be caught as VideoAnalysisError."""
         with pytest.raises(VideoAnalysisError):
-            raise APIError("API call failed")
+            raise APIError("API call unanalyzed")
 
 
 class TestExceptionHierarchy:
@@ -155,7 +155,7 @@ class TestExceptionHierarchy:
             try:
                 raise original_error
             except ValueError as e:
-                raise VideoLoadError("Loading failed") from e
+                raise VideoLoadError("Loading unanalyzed") from e
 
         assert exc_info.value.__cause__ == original_error
 
@@ -200,9 +200,9 @@ class TestExceptionStringRepresentation:
 
     def test_exception_repr(self):
         """Test exception repr."""
-        error = ModelInferenceError("Inference failed")
+        error = ModelInferenceError("Inference unanalyzed")
         # repr should include the class name and message
-        assert "ModelInferenceError" in repr(error) or "Inference failed" in repr(error)
+        assert "ModelInferenceError" in repr(error) or "Inference unanalyzed" in repr(error)
 
     def test_empty_exception_message(self):
         """Test exception with empty message."""
