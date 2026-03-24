@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   video-analyzer:
     build: .
@@ -13,9 +11,9 @@ services:
       - HF_TOKEN=${HF_TOKEN:-}
     volumes:
       - ./:/app:cached
-      - jobs-data:/app/.jobs.db
+      - jobs-data:/app/data
       - video-data:/app/videos
-    command: ["video-analyzer-api", "--host", "0.0.0.0", "--port", "3002"]
+    command: ["video-analyzer-api", "--host", "0.0.0.0", "--port", "3002", "--db", "/app/data/.jobs.db"]
     restart: unless-stopped
 
 volumes:

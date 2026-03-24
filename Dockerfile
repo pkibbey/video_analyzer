@@ -15,15 +15,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Python package dependencies
-COPY pyproject.toml pyproject.toml
-COPY README.md README.md
+# Copy application source and metadata (needed for pip install)
+COPY pyproject.toml README.md /app/
+COPY . /app
 
+# Install Python package dependencies
 RUN pip install --upgrade pip setuptools wheel && \
     pip install .
-
-# Copy application source
-COPY . /app
 
 # Expose API port
 EXPOSE 3002
